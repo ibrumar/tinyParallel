@@ -97,7 +97,7 @@ instruction
         ;
 
 // Assignment
-assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,":="] ID expr)
+assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,":="] ident expr)
         ;
 
 // if-then-else (else is optional)
