@@ -97,7 +97,7 @@ instruction
         ;
 
 // Assignment
-assign	:	ID eq=EQUAL expr -> ^(ASSIGN[$eq,":="] ID expr)
+assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,":="] ID expr)
         ;
 
 // if-then-else (else is optional)
@@ -142,12 +142,14 @@ factor  :   (NOT^ | PLUS^ | MINUS^)? atom
 // Atom of the expressions (variables, integer and boolean literals).
 // An atom can also be a function call or another expression
 // in parenthesis
-atom    :   ID 
+atom    :  ident 
         |   INT
         |   (b=TRUE | b=FALSE)  -> ^(BOOLEAN[$b,$b.text])
         |   funcall
         |   '('! expr ')'!
         ;
+
+ident   :  ID (OPENC^ expr CLOSEC!)? ;
 
 // A function call has a lits of arguments in parenthesis (possibly empty)
 funcall :   ID '(' expr_list? ')' -> ^(FUNCALL ID ^(ARGLIST expr_list?))
@@ -158,6 +160,8 @@ expr_list:  expr (','! expr)*
         ;
 
 // Basic tokens
+OPENC	:	'[' ;
+CLOSEC: ']' ;
 EQUAL	: '=' ;
 NOT_EQUAL: '!=' ;
 LT	    : '<' ;
