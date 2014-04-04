@@ -105,6 +105,7 @@ public class Data {
     public boolean getBooleanValue(int index) {
         assert type == Type.BOOLEAN;
         assert isArray;
+        
         return array.elementAt(index).intValue() == 1;
     }
 
@@ -112,6 +113,7 @@ public class Data {
     public int getIntegerValue(int index) {
         assert type == Type.INTEGER;
         assert isArray;
+        //if (! isArray) System.out.println("IT EXISTS");
         return array.elementAt(index).intValue();
     }
 

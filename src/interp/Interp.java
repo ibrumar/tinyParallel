@@ -163,7 +163,7 @@ public class Interp {
         // Gather the list of arguments of the caller. This function
         // performs all the checks required for the compatibility of
         // parameters.
-        ArrayList<Data> Arg_values = listArguments(f, args);
+        ArrayList<Data> Arg_values = listArguments(f, args);//retorna els valors dels arguments
 
         // Dumps trace information (function call and arguments)
         if (trace != null) traceFunctionCall(f, Arg_values);
@@ -261,7 +261,7 @@ public class Interp {
                 if (t.getChild(0).getType() == AslLexer.OPENC) {
                     AslTree arrayNode = t.getChild(0);
                     assignToArray(arrayNode, value);
-                    Stack.defineVariable (arrayNode.getChild(0).getText(), value);
+        //            Stack.defineVariable (arrayNode.getChild(0).getText(), value);
                 }
                 else {
                     //handle the case where t.getChild(0) was a array
@@ -375,8 +375,9 @@ public class Interp {
                 AslTree nameNode = t.getChild(0);
                 int index = evaluateExpression(t.getChild(1)).getIntegerValue();;
                 Data arrayData = Stack.getVariable(nameNode.getText());
-                if (arrayData.getType() == Data.Type.INTEGER)
+                if (arrayData.getType() == Data.Type.INTEGER) {
                     value = new Data(arrayData.getIntegerValue(index));
+                }
                 else value = new Data(arrayData.getBooleanValue(index));
 
                 break;
