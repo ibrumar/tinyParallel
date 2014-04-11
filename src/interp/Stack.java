@@ -96,6 +96,13 @@ public class Stack {
         else d.setData(value); // Use the previous data 
     }
 
+	/*public boolean existsVariable(String name) {
+        Data d = CurrentAR.get(name);
+        if (d != null) return true; // New definition
+		  else 
+            throw new RuntimeException ("Variable " + name + " not defined");
+    }*/
+
     /** Gets the value of the variable. The value is represented as
      * a Data object. In this way, any modification of the object
      * implicitly modifies the value of the variable.
@@ -110,10 +117,12 @@ public class Stack {
         return v;
     }
 
-    public boolean variableExists(String name) {
+    /*Throws exception if the variale name doesn't exist*/
+    public void checkVariableExists(String name) {
         Data v = CurrentAR.get(name);
-        if (v == null) return false;
-        else return true;
+        if (v == null) {
+            throw new RuntimeException ("Variable " + name + " not defined");
+        }
     }
 
     /**

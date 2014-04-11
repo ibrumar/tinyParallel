@@ -1,30 +1,3 @@
-/**
- * Copyright (c) 2011, Jordi Cortadella
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *    * Redistributions of source code must retain the above copyright
- *      notice, this list of conditions and the following disclaimer.
- *    * Redistributions in binary form must reproduce the above copyright
- *      notice, this list of conditions and the following disclaimer in the
- *      documentation and/or other materials provided with the distribution.
- *    * Neither the name of the <organization> nor the
- *      names of its contributors may be used to endorse or promote products
- *      derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 grammar Asl;
 
 options {
@@ -32,11 +5,17 @@ options {
     ASTLabelType = AslTree;
 }
 
-// Imaginary tokens to create some AST nodes
+
+
+
+/* ASL IMPORTED TOKENS!!!!*/
 
 tokens {
-    LIST_FUNCTIONS; // List of functions (the root of the tree)
+    PROG;
+    MAIN;
+    INSTR_BLOCK;
     ASSIGN;     // Assignment instruction
+    PAR_ASSIGN;     // Assignment instruction
     PARAMS;     // List of parameters in the declaration of a function
     FUNCALL;    // Function call
     ARGLIST;    // List of arguments passed in a function call
@@ -44,6 +23,7 @@ tokens {
     BOOLEAN;    // Boolean atom (for Boolean constants "true" or "false")
     PVALUE;     // Parameter by value in the list of parameters
     PREF;       // Parameter by reference in the list of parameters
+    DECL;
 }
 
 @header {
@@ -55,57 +35,74 @@ import interp.AslTree;
 package parser;
 }
 
+instruction
+			:	assign ';'!          // Assignment
+			|	ite_stmt        // if-then-else
+			|	funcall ';'!        // Call to a procedure (no result produced)
+			|	return_stmt ';'!    // Return statement
+			|	read ';'!          // Read a variable
+			| 	write ';'!          // Write a string or an expression
+			|	meufor
+			|	parallel_instruction
+			|	decl ';'!
+			;
 
-// A program is a list of functions
-prog	: func+ EOF -> ^(LIST_FUNCTIONS func+)
-        ;
-            
-// A function has a name, a list of parameters and a block of instructions	
-func	: FUNC^ ID params block_instructions ENDFUNC!
-        ;
+/*LANGUAGE SPECIFIC TOKENS*/
 
-// The list of parameters grouped in a subtree (it can be empty)
+
+prog	:	func* main EOF -> ^(PROG func* main)
+		;
+
+main	:	instruction* -> ^(MAIN INT PARAMS ^(INSTR_BLOCK instruction*))
+		;
+
+func	:	type ID^ params block_instructions
+		;
+
+type	:	INT|BOOL
+		;
+
 params	: '(' paramlist? ')' -> ^(PARAMS paramlist?)
         ;
 
 // Parameters are separated by commas
 paramlist: param (','! param)*
-        ;
+        ;//preguntar si se debe implementar paso por valor o por referencia
+ 
+param	:	type '&' id=ID -> ^(type PREF[$id,$id.text])
+		|	type id=ID -> ^(type PVALUE[$id,$id.text])
+		;
 
-// Parameters with & as prefix are passed by reference
-// Only one node with the name of the parameter is created
-param   :   '&' id=ID -> ^(PREF[$id,$id.text])
-        |   id=ID -> ^(PVALUE[$id,$id.text])
-        ;
+block_instructions	: '{' instruction* '}' -> ^(INSTR_BLOCK instruction*)
+		;
 
-// A list of instructions, all of them gouped in a subtree
-block_instructions
-        :	 instruction (';' instruction)*
-            -> ^(LIST_INSTR instruction+)
-        ;
+//parallel_instruction_block : BEGIN_PARALLEL '{'! parallel_bloc_header block_instructions'}'!  END_PARALLEL
 
-// The different types of instructions
-instruction
-        :	assign          // Assignment
-        |	ite_stmt        // if-then-else
-        |	while_stmt      // while statement
-        |   funcall         // Call to a procedure (no result produced)
-        |	return_stmt     // Return statement
-        |	read            // Read a variable
-        | 	write           // Write a string or an expression
-        |                   // Nothing
-        ;
+
+parallel_instruction	:	BEGIN_PARALLEL^  parallel_bloc_header block_instructions END_PARALLEL! |
+								NOT_SYNC^ block_instructions	|
+								PARALLEL_FOR^ for_header block_instructions |
+								ID eq=PAR_EQUAL ID '$' expr '$;'-> ^(PAR_ASSIGN[$eq,":="] ID ID expr);
+
+//variables compartidas por defecto
+parallel_bloc_header	:	(PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)?  ;
+
+
+for_header: '('! assign  ';'! expr ';'! assign ')'!;
 
 // Assignment
-assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,":="] ident expr)
-        ;
+assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,"="] ident expr)
+        ; //bien
+        
+
+decl		:	type ident -> ^(DECL type ident) ;
 
 // if-then-else (else is optional)
-ite_stmt	:	IF^ expr THEN! block_instructions (ELSE! block_instructions)? ENDIF!
-            ;
+ite_stmt	:	IF^ '('! expr ')'!  block_instructions  (ELSE! block_instructions)?
+            ; //bloque instrucciones debe ser { instrucciones* }
 
 // while statement
-while_stmt	:	WHILE^ expr DO! block_instructions ENDWHILE!
+meufor	:	FOR^ for_header block_instructions 
             ;
 
 // Return statement with an expression
@@ -127,7 +124,7 @@ expr    :   boolterm (OR^ boolterm)*
 boolterm:   boolfact (AND^ boolfact)*
         ;
 
-boolfact:   num_expr ((EQUAL^ | NOT_EQUAL^ | LT^ | LE^ | GT^ | GE^) num_expr)?
+boolfact:   num_expr ((EQUALEQUAL^ | NOT_EQUAL^ | LT^ | LE^ | GT^ | GE^) num_expr)?
         ;
 
 num_expr:   term ( (PLUS^ | MINUS^) term)*
@@ -143,13 +140,14 @@ factor  :   (NOT^ | PLUS^ | MINUS^)? atom
 // An atom can also be a function call or another expression
 // in parenthesis
 atom    :  ident 
-        |   INT
+        |   INTLIT
         |   (b=TRUE | b=FALSE)  -> ^(BOOLEAN[$b,$b.text])
         |   funcall
         |   '('! expr ')'!
         ;
 
-ident   :  ID (OPENC^ expr CLOSEC!)? ;
+ident   :  ID (OPENC^ expr CLOSEC!)?
+		  ;
 
 // A function call has a lits of arguments in parenthesis (possibly empty)
 funcall :   ID '(' expr_list? ')' -> ^(FUNCALL ID ^(ARGLIST expr_list?))
@@ -159,14 +157,24 @@ funcall :   ID '(' expr_list? ')' -> ^(FUNCALL ID ^(ARGLIST expr_list?))
 expr_list:  expr (','! expr)*
         ;
 
-// Basic tokens
+
+// END ASL IMPORTED TOKENS
+
+
+//BASIC TOKENS
+
+//TYPE	:	INT                                |BOOL;
+INT	:	'int';
+BOOL	:	'bool';
 OPENC	:	'[' ;
-CLOSEC: ']' ;
-EQUAL	: '=' ;
-NOT_EQUAL: '!=' ;
-LT	    : '<' ;
-LE	    : '<=';
-GT	    : '>';
+CLOSEC	:	']' ;
+EQUAL	:	 '=' ;
+PAR_EQUAL	:	':=';
+EQUALEQUAL	: '==' ;
+NOT_EQUAL: 	'!=' ;
+LT	 	: '<' ;
+LE	:	 '<=';
+GT	:	 '>';
 GE	    : '>=';
 PLUS	: '+' ;
 MINUS	: '-' ;
@@ -177,21 +185,21 @@ NOT	    : 'not';
 AND	    : 'and' ;
 OR	    : 'or' ;	
 IF  	: 'if' ;
-THEN	: 'then' ;
 ELSE	: 'else' ;
-ENDIF	: 'endif' ;
-WHILE	: 'while' ;
-DO	    : 'do' ;
-ENDWHILE: 'endwhile' ;
+PARALLEL_FOR	:	'parallel_for';
+PRIVATE_VAR		:	'private_var';
+BEGIN_PARALLEL	:	'begin_parallel';
+END_PARALLEL	:	'end_parallel';
+NOT_SYNC			:	'not_sync';
+FOR	:	'for';
 FUNC	: 'func' ;
-ENDFUNC	: 'endfunc' ;
 RETURN	: 'return' ;
 READ	: 'read' ;
 WRITE	: 'write' ;
 TRUE    : 'true' ;
 FALSE   : 'false';
 ID  	:	('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'0'..'9'|'_')* ;
-INT 	:	'0'..'9'+ ;
+INTLIT	:	'0'..'9'+ ;
 
 // C-style comments
 COMMENT	: '//' ~('\n'|'\r')* '\r'? '\n' {$channel=HIDDEN;}
