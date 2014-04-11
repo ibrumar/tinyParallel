@@ -89,15 +89,20 @@ public class Interp {
 
     /** Runs the program by calling the main function without parameters. */
     public void Run() {
-        //HACE FALTA PONER LA PRIMERA FUNCIÓN
+        //Basic initializations
+        System.out.println("#include <iostream>");
+        System.out.println("#include <vector>");
+        System.out.println("using namespace std;");
+
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
-            if (funcNameStr == "MAIN") generateFunction("main", null);
+            if (funcNameStr == "main") generateFunction("main");
             else {
+                System.out.println("Help" + funcNameStr);
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
-                generateFunction(funcNameStr, funcNode.getChild(1));
+                generateFunction(funcNameStr);
             }
         }
         
@@ -182,43 +187,55 @@ public class Interp {
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.
      */
-    private Data generateFunction (String funcname, AslTree args) {
+    private Data generateFunction (String funcnameArg) {
         // Get the AST of the function
-        AslTree f = FuncName2Tree.get(funcname);
-        if (f == null) throw new RuntimeException(" function " + funcname + " not declared");
+        AslTree f = FuncName2Tree.get(funcnameArg);
+        //For main we simulate just a list of normal instructions
+        if (f == null) throw new RuntimeException(" function " + funcnameArg + " not declared");
 
-        // Gather the list of arguments of the caller. This function
-        // performs all the checks required for the compatibility of
-        // parameters.
-        ArrayList<Data> Arg_values = listArguments(f, args);
+        AslTree returnType = f.getChild(0);
+        String funcName = f.getText();
 
-        // Dumps trace information (function call and arguments)
-        if (trace != null) traceFunctionCall(f, Arg_values); //REVISAR
+        switch (returnType.getType()) {
+            case AslLexer.INT: System.out.print("int "); break;
+            case AslLexer.BOOL: System.out.print("bool "); break;
+            default: throw new RuntimeException("Not a recognized return type");
+        }
+        
+        //we use funcnameArg because in the case of the main
+        //in the tree we have a MAIN imaginary token not "main"
+        System.out.print(funcnameArg + "(");
+
         
         // List of parameters of the callee
         AslTree p = f.getChild(1);
         int nparam = p.getChildCount(); // Number of parameters
 
         // Create the activation record in memory
-        Stack.pushActivationRecord(funcname, lineNumber());
+        Stack.pushActivationRecord(funcnameArg, lineNumber());
 
-        // Track line number
+        // Track line number. Maybe the previous line should be changed with this one
         setLineNumber(f);
          
         // Copy the parameters to the current activation record
         for (int i = 0; i < nparam; ++i) {
-            String param_name = p.getChild(i).getText();
-            Stack.defineVariable(param_name, Arg_values.get(i));
-        } //QUEDA PER FER
+            AslTree paramNode = p.getChild(i);
+            
+            System.out.print(paramNode.getChild(0).getText() + " ");
+            System.out.print("&");
 
+            String param_name = paramNode.getChild(0).getText();
+            System.out.print(param_name);
+            Stack.defineVariable(param_name, new Data(paramNode.getText()));
+        }
+
+        System.out.println (") {");
         // Execute the instructions
         Data result = generateListInstructions (f.getChild(2));
+        System.out.print ("}");
 
         // If the result is null, then the function returns void
         if (result == null) result = new Data("void");
-        
-        // Dumps trace information
-        if (trace != null) traceReturn(f, result, Arg_values);
         
         // Destroy the activation record
         Stack.popActivationRecord();
@@ -261,7 +278,9 @@ public class Interp {
         
         AslTree args = t.getChild(1);
         int numArgs = args.getChildCount();
-        AslTree paramsNode = FuncName2Tree.get(funcName).getChild(1);
+        
+        AslTree functionTree = FuncName2Tree.get(funcName);
+        AslTree paramsNode = functionTree.getChild(1);
         int numParams = paramsNode.getChildCount();
         if (numArgs != numParams)
             throw new RuntimeException ("Number of arguments doesn't match the number of parameters in"+ funcName );
@@ -272,14 +291,21 @@ public class Interp {
         for (int i = 0; i < numArgs; ++i) {
             if (firstIter) firstIter = false;
             else System.out.print(", ");
-
-            Data res = generateExpression(args.getChild(i));
+            
+            AslTree a = args.getChild(i);
+            AslTree p = paramsNode.getChild(i);
+            if (a.getType() != AslLexer.ID && p.getChild(0).getType() == AslLexer.PREF)
+                throw new RuntimeException ("Argument " + i + "must be an identifier. The corresponding parameter is reference passed");
+            
+            setLineNumber(a);
+            Data res = generateExpression(a);
             checkParamsArgs(paramsNode, res, i);
         }
-        Data value = new Data(FuncName2Tree.get(funcName).getChild(0).getText()); //this tells you the type returned
+        Data value = new Data(functionTree.getChild(0).getText()); //this tells you the type returned
         System.out.println(");");
         return value;
     }
+
 
 
     /**
@@ -317,6 +343,8 @@ public class Interp {
                 //POSIBLEMENTE LA QUITAMOS Y LA STACK APUNTARA SOLO
                 //A LOS TIPOS
                 value = new Data(t.getChild(0).getText());
+                System.out.println(t.getChild(0).getText() + " " + t.getChild(1).getText() + ";");//this won't work if working with
+                //arrays
                 Stack.defineVariable (t.getChild(1).getText(), value);
                 return;
             case AslLexer.IF:
@@ -564,53 +592,6 @@ public class Interp {
         }
     }
 
-    /**
-     * Gathers the list of arguments of a function call. It also checks
-     * that the arguments are compatible with the parameters. In particular,
-     * it checks that the number of parameters is the same and that no
-     * expressions are passed as parametres by reference.
-     * @param AstF The AST of the callee.
-     * @param args The AST of the list of arguments passed by the caller.
-     * @return The list of evaluated arguments.
-     */
-     
-    private ArrayList<Data> listArguments (AslTree AstF, AslTree args) {
-        if (args != null) setLineNumber(args);
-        AslTree pars = AstF.getChild(1);   // Parameters of the function
-        
-        // Create the list of parameters
-        ArrayList<Data> Params = new ArrayList<Data> ();
-        int n = pars.getChildCount();
-
-        // Check that the number of parameters is the same
-        int nargs = (args == null) ? 0 : args.getChildCount();
-        if (n != nargs) {
-            throw new RuntimeException ("Incorrect number of parameters calling function " +
-                                        AstF.getChild(0).getText());
-        }
-
-        // Checks the compatibility of the parameters passed by
-        // reference and calculates the values and references of
-        // the parameters.
-        for (int i = 0; i < n; ++i) {
-            AslTree p = pars.getChild(i); // Parameters of the callee
-            AslTree a = args.getChild(i); // Arguments passed by the caller
-            setLineNumber(a);
-            if (p.getType() == AslLexer.PVALUE) {
-                // Pass by value: evaluate the expression
-                Params.add(i,generateExpression(a));
-            } else {
-                // Pass by reference: check that it is a variable
-                if (a.getType() != AslLexer.ID) {
-                    throw new RuntimeException("Wrong argument for pass by reference");
-                }
-                // Find the variable and pass the reference
-                Data v = Stack.getVariable(a.getText());
-                Params.add(i,v);
-            }
-        }
-        return Params;
-    }
 
     /**
      * Writes trace information of a function call in the trace file.

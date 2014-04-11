@@ -93,7 +93,8 @@ public class Stack {
     public void defineVariable(String name, Data value) {
         Data d = CurrentAR.get(name);
         if (d == null) CurrentAR.put(name, value); // New definition
-        else d.setData(value); // Use the previous data 
+        else  
+            throw new RuntimeException ("Variable " + name + " already defined");
     }
 
 	/*public boolean existsVariable(String name) {
