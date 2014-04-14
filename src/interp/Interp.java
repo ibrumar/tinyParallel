@@ -181,9 +181,8 @@ public class Interp {
      * Executes a function.
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
-     * @return The data returned by the function.
-     */
-    private Data generateFunction (String funcnameArg) {
+     * @return The data returned by the function.*/
+      private Data generateFunction (String funcnameArg) {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -200,7 +199,7 @@ public class Interp {
         
         //we use funcnameArg because in the case of the main
         //in the tree we have a MAIN imaginary token not "main"
-        System.out.print(funcnameArg + "(");
+        System.out.print(funcnameArg + " (");
 
         
         // List of parameters of the callee
@@ -216,12 +215,19 @@ public class Interp {
         // Copy the parameters to the current activation record
         for (int i = 0; i < nparam; ++i) {
             AslTree paramNode = p.getChild(i);
+           
+	    String param_type = paramNode.getText();
+            System.out.print(param_type + " ");
             
-            System.out.print(paramNode.getChild(0).getText() + " ");
+            if (AslLexer.PREF == paramNode.getChild(0).getType()){
             System.out.print("&");
-
+            }
+            
             String param_name = paramNode.getChild(0).getText();
             System.out.print(param_name);
+            if (i < nparam-1){
+            System.out.print(", ");
+            }
             Stack.defineVariable(param_name, new Data(paramNode.getText()));
         }
 
@@ -238,7 +244,7 @@ public class Interp {
 
         return result;
     }
-
+     
     /**
      * Executes a block of instructions. The block is terminated
      * as soon as an instruction returns a non-null result.
