@@ -59,13 +59,13 @@ public class Data {
     public String getType() { return type; }
 
     /** Indicates whether the data is Boolean */
-    public boolean isBoolean() { return type == "bool"; }
+    public boolean isBoolean() { return type.equals("bool"); }
 
     /** Indicates whether the data is integer */
-    public boolean isInteger() { return type == "int"; }
+    public boolean isInteger() { return type.equals("int"); }
 
     /** Indicates whether the data is void */
-    public boolean isVoid() { return type == "void"; }
+    public boolean isVoid() { return type.equals("void"); }
 
    
     /** Returns a string representing the data in textual form. */

@@ -97,7 +97,7 @@ public class Interp {
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
-            if (funcNameStr == "main") generateFunction("main");
+            if (funcNameStr.equals("main")) generateFunction("main");
             else {
                 System.out.println("Help" + funcNameStr);
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
@@ -481,6 +481,7 @@ public class Interp {
             value = generateExpression(t.getChild(0));
             System.out.print(")");
             
+            
             switch (type) {
                 case AslLexer.PLUS:
                     checkInteger(value);
@@ -514,7 +515,6 @@ public class Interp {
                 value = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
-                System.out.println(";");
                 if (value.getType() != value2.getType()) {
                   throw new RuntimeException ("Incompatible types in relational expression");
                 }
@@ -530,10 +530,8 @@ public class Interp {
                 Data value1 = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
-                System.out.println(";");
-                
-                if (value1.getType() != value2.getType()) {
-                  throw new RuntimeException ("Incompatible types in arithmetic expression");
+                if (!value1.getType().equals(value2.getType())) {
+                    throw new RuntimeException ("Incompatible types in arithmetic expression");
                 }
  
                 break;
