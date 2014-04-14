@@ -86,7 +86,6 @@ public class Interp {
         }
         function_nesting = -1;
     }
-
     /** Runs the program by calling the main function without parameters. */
     public void Run() {
         //Basic initializations
@@ -115,10 +114,7 @@ public class Interp {
     }
 
     /** Returns a summarized contents of the stack trace */
-    public String getStackTrace(int nitems) {
-        return Stack.getStackTrace(lineNumber(), nitems);
-    }
-    
+
     /**
      * Gathers information from the AST and creates the map from
      * function names to the corresponding AST nodes.
@@ -333,6 +329,7 @@ public class Interp {
                 Data value = generateExpression(t.getChild(1));
                 
                 System.out.print(";\n");
+                return;
 
             // If-then-else
             case AslLexer.DECL:
