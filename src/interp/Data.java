@@ -46,14 +46,14 @@ public class Data {
     /** Type of data*/
     //private Type type;
 
-
+    private boolean isVector;
     /** Constructor for integers */
 
     /** Constructor for Booleans */
-    Data(String s) { type = s; }
+    Data(String s) { type = s; isVector = false; }
 
     /** Copy constructor */
-    Data(Data d) { type = d.type;}
+    Data(Data d) { type = d.type; isVector = d.isVector; }
 
     /** Returns the type of data */
     public String getType() { return type; }
@@ -67,7 +67,13 @@ public class Data {
     /** Indicates whether the data is void */
     public boolean isVoid() { return type.equals("void"); }
 
-   
+    /** Indicates whether the data is a vector */
+    public boolean isVector() { return isVector; }
+  
+
+    /** Indicates whether the data is a vector */
+    public void setVector() { isVector = true; }
+
     /** Returns a string representing the data in textual form. */
     public String toString() {
         return type;

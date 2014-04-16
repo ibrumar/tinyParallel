@@ -339,16 +339,26 @@ public class Interp {
 
             // If-then-else
             case AslLexer.DECL:
-                //NOS QUEDAMOS AQUI
-                //DEBEMOS QUITAR DE LA STACK LOS VALORES
-                //Y SOLO PERMITIR DECLARACIONES
-                //LA CLASE DATA SIRVE SOLO PARA COMPROVACIONES DE TIPO
-                //POSIBLEMENTE LA QUITAMOS Y LA STACK APUNTARA SOLO
-                //A LOS TIPOS
-                value = new Data(t.getChild(0).getText());
-                System.out.println(t.getChild(0).getText() + " " + t.getChild(1).getText() + ";");//this won't work if working with
-                //arrays
-                Stack.defineVariable (t.getChild(1).getText(), value);
+          
+                AslTree identNode = t.getChild(1);
+                AslTree typeNode = t.getChild(0);
+                Data value = new Data(typeNode.getText());
+
+                if (identNode.getType() == AslLexer.OPENC) {
+
+                    System.out.print(typeNode.getText() + " " + identNode.getChild(0).getText() + "[");
+                    Data vectorIndex = generateExpression(identNode.getChild(1));
+                    System.out.println("];");
+                    
+                    checkInteger(vectorIndex);
+                    
+                    value.setArray();
+                    Stack.defineVariable (identNode.getChild(0).getText(), value);
+                }
+                else {
+                    System.out.println(typeNode.getText() + " " + identNode.getText() + ";");//this won't work if working with
+                    Stack.defineVariable (t.getChild(1).getText(), value);
+                }
                 return;
             case AslLexer.IF:
                 value = generateExpression(t.getChild(0));
@@ -588,7 +598,7 @@ public class Interp {
     
     /** Checks that the data is integer and raises an exception if it is not. */
     private void checkInteger (Data b) {
-        if (!b.isInteger()) {
+        if (!b.isInteger() || b.isVector()) {
             throw new RuntimeException ("Expecting numerical expression");
         }
     }
