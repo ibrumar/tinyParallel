@@ -216,17 +216,17 @@ public class Interp {
         for (int i = 0; i < nparam; ++i) {
             AslTree paramNode = p.getChild(i);
            
-	    String param_type = paramNode.getText();
+            String param_type = paramNode.getText();
             System.out.print(param_type + " ");
             
-            if (AslLexer.PREF == paramNode.getChild(0).getType()){
-            System.out.print("&");
+            if (AslLexer.PREF == paramNode.getChild(0).getType()) {
+                System.out.print("&");
             }
             
             String param_name = paramNode.getChild(0).getText();
             System.out.print(param_name);
-            if (i < nparam-1){
-            System.out.print(", ");
+            if (i < nparam-1) {
+                System.out.print(", ");
             }
             Stack.defineVariable(param_name, new Data(paramNode.getText()));
         }
