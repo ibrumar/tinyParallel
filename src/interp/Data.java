@@ -76,7 +76,7 @@ public class Data {
 
     /** Returns a string representing the data in textual form. */
     public String toString() {
-        return type;
+        return "The type is " + type + " isVector boolean has value " + isVector;
     }
     
 

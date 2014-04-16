@@ -328,31 +328,49 @@ public class Interp {
 
             // Assignment
             case AslLexer.ASSIGN:
+            {
                 //The following call is used only for existance check
-                Data toChange = Stack.getVariable(t.getChild(0).getText());
-                
-                System.out.print(t.getChild(0).getText() + " = ");
-                Data value = generateExpression(t.getChild(1));
-                
+                AslTree identNode = t.getChild(0);
+                AslTree exprNode = t.getChild(1);
+                Data toChange;
+                if (identNode.getType() != AslLexer.OPENC) {
+                    toChange = Stack.getVariable(identNode.getText());
+                    System.out.print(identNode.getText() + " = ");
+                }
+                else {
+                    toChange = Stack.getVariable(identNode.getChild(0).getText());
+                    checkVector(toChange);
+                    
+                    System.out.print(identNode.getChild(0).getText() + "[");
+                    Data vectorIndex = generateExpression(identNode.getChild(1));
+                    System.out.print("] = ");
+
+                }
+                Data value = generateExpression(exprNode);
+                if (!value.getType().equals(toChange.getType()))
+                    throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
+
                 System.out.print(";\n");
                 return;
 
+            }
             // If-then-else
             case AslLexer.DECL:
-          
+            {
                 AslTree identNode = t.getChild(1);
                 AslTree typeNode = t.getChild(0);
                 Data value = new Data(typeNode.getText());
 
                 if (identNode.getType() == AslLexer.OPENC) {
-
-                    System.out.print(typeNode.getText() + " " + identNode.getChild(0).getText() + "[");
+                    String vectorType = "vector<" + typeNode.getText() + "> ";
+                    System.out.print( vectorType + identNode.getChild(0).getText());
+                    System.out.print(" = * new " + vectorType + "(");
                     Data vectorIndex = generateExpression(identNode.getChild(1));
-                    System.out.println("];");
+                    System.out.println(", 0);"); //it fills all declared vectors with zeros
                     
                     checkInteger(vectorIndex);
                     
-                    value.setArray();
+                    value.setVector();
                     Stack.defineVariable (identNode.getChild(0).getText(), value);
                 }
                 else {
@@ -360,15 +378,17 @@ public class Interp {
                     Stack.defineVariable (t.getChild(1).getText(), value);
                 }
                 return;
+            }
             case AslLexer.IF:
-                value = generateExpression(t.getChild(0));
+            {
+                Data value = generateExpression(t.getChild(0));
                 checkBoolean(value);
                 
                 generateListInstructions(t.getChild(1));
                 // Is there else statement ?
                 generateListInstructions(t.getChild(2));
                 return;
-
+            }
             // While
            /* case AslLexer.WHILE:
                 while (true) {
@@ -448,6 +468,19 @@ public class Interp {
                 System.out.print(t.getText());
                 break;
             // An integer literal
+            case AslLexer.OPENC:
+                
+                System.out.print(t.getChild(0).getText() + "[");
+                Data vectorIndex = generateExpression(t.getChild(1));
+                System.out.print("]");
+                    
+                checkInteger(vectorIndex);
+                    
+                Data vectorData = Stack.getVariable(t.getChild(0).getText());
+                checkVector(vectorData);
+                value = new Data(vectorData.getType()); // the returned data has the type
+                                                        // of an element of the array
+                break; 
             case AslLexer.INTLIT:
                 value = new Data("int");
                 System.out.print(t.getText());
@@ -543,10 +576,10 @@ public class Interp {
             case AslLexer.DIV:
             case AslLexer.MOD:
              
-                Data value1 = generateExpression(t.getChild(0));
+                value = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
-                if (!value1.getType().equals(value2.getType())) {
+                if (!value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in arithmetic expression");
                 }
  
@@ -603,6 +636,12 @@ public class Interp {
         }
     }
 
+    /** Checks that the data is integer and raises an exception if it is not. */
+    private void checkVector (Data b) {
+        if (!b.isVector()) {
+            throw new RuntimeException ("Expecting a name that points to a vector");
+        }
+    }
 
     /**
      * Writes trace information of a function call in the trace file.

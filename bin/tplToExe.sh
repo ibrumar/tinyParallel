@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+  echo "Usage: $0 <sourceFile[without .tpl]>"
+  exit
+fi
+
+./Asl $1.tpl > $1.cpp
+g++ $1.cpp -O0 -o $1
