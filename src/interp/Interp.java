@@ -65,6 +65,11 @@ public class Interp {
     /** Nested levels of function calls. */
     private int function_nesting = -1;
     
+    /** Says if the compilation is done in a parallel region */
+    private boolean inParallelRegion = false;
+
+    /** Says if the compilation is done in notSync region */
+    private boolean inNotSyncRegion = false;
     /**
      * Constructor of the interpreter. It prepares the main
      * data structures for the execution of the main program.
