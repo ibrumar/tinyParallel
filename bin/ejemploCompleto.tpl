@@ -1,4 +1,4 @@
-int errorManager(int code) {
+int errorManager(int code[]) {
 	write "error: index out of bounds";
 	exit(0);
 	return 0;
