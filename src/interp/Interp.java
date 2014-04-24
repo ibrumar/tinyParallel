@@ -381,12 +381,25 @@ public class Interp {
             }
             case AslLexer.IF:
             {
-                Data value = generateExpression(t.getChild(0));
+            	System.out.print("if (");
+            	
+            	Data value = generateExpression(t.getChild(0));
+              
                 checkBoolean(value);
                 
+                System.out.println(") {");
+                
                 generateListInstructions(t.getChild(1));
-                // Is there else statement ?
+                
+                System.out.println("}");
+                
+                if (t.getChildCount() == 3){ 
+                //test of the presence of else statement
+                System.out.println("else {");
                 generateListInstructions(t.getChild(2));
+                System.out.println("}");
+                }
+                
                 return;
             }
             // While
@@ -400,6 +413,42 @@ public class Interp {
                 }*/
 
             // Return
+            
+            
+              case AslLexer.FOR:
+           	
+           	System.out.print("for (");
+           	
+		/* header - parte assignation del variant*/
+		String varBoucle = t.getChild(0).getChild(0).getText();
+		Data variant = Stack.getVariable(varBoucle);
+		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
+		generateInstruction(t.getChild(0));
+		
+		/*header - parte increment*/
+		AslTree forCompa = t.getChild(1);
+		
+            	if (forCompa.getType() != AslLexer.LE &&
+            		forCompa.getType() != AslLexer.LT &&
+            		forCompa.getType() != AslLexer.GE &&
+            		forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
+            
+            	generateExpression(forCompa);
+            	
+            	System.out.print(";");
+            	  	
+		AslTree forPlus = t.getChild(2);
+		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
+            	generateInstruction(forPlus);
+            	
+            	System.out.println(") {");
+            	
+            	//instructions in the for
+            	generateListInstructions(t.getChild(3));
+            	
+            	System.out.println("}");
+            	return;
+            	
             case AslLexer.RETURN:
                 if (t.getChildCount() != 0) {
                     generateExpression(t.getChild(0));
@@ -457,7 +506,7 @@ public class Interp {
         int previous_line = lineNumber();
         setLineNumber(t);
         int type = t.getType();
-
+        
         Data value = null;
         // Atoms
         switch (type) {
@@ -564,7 +613,10 @@ public class Interp {
                 value = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
-                if (value.getType() != value2.getType()) {
+                
+                /*System.out.println ("ousti"+value.getType());
+                System.out.println ("ousti2"+value2.getType());*/
+                if (! value.getType().equals(value2.getType())) {
                   throw new RuntimeException ("Incompatible types in relational expression");
                 }
                 break;
