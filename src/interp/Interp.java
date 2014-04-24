@@ -319,6 +319,46 @@ public class Interp {
     }
 
 
+    void generateParallelZone(AslTree t) {
+        /** Says if the compilation is done in a parallel region */
+        if (inParallelRegion)
+            throw new RuntimeException ("\n Opening a parallel region inside another parallel region it's not permited\n" );
+        inParallelRegion = true;
+        String parallelZoneHeader = "#pragma omp parallel";
+        
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+            
+            AslTree privateVarNode = t.getChild(0);
+            
+            parallelZoneHeader += " private(" + privateVarNode.getChild(0); //there must be at least one private var
+            boolean first = true; 
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+                thePrivateVar.setShared(false);
+                if (first) first = false;
+                else parallelZoneHeader += ", " +  privateVarNode.getChild(i).getText();
+            }
+            parallelZoneHeader += ")";
+            System.out.println (parallelZoneHeader);
+        } 
+        
+        System.out.println ("{");
+        generateListInstructions(t.getChild(1));
+        System.out.println ("\n}");
+        
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+            
+            AslTree privateVarNode = t.getChild(0);
+
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+                thePrivateVar.setShared(true);
+            }
+        }
+        // you must take care because the variables declared inside the parallel zone must die
+        inParallelRegion = false;
+    }
+
 
     /**
      * Executes an instruction. 
@@ -336,6 +376,12 @@ public class Interp {
         // A big switch for all type of instructions
         switch (t.getType()) {
 
+            case AslLexer.BEGIN_PARALLEL:
+            {
+                generateParallelZone(t);
+                return;
+            }
+            
             // Assignment
             case AslLexer.ASSIGN:
             {

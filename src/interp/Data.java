@@ -47,13 +47,13 @@ public class Data {
     //private Type type;
 
     private boolean isVector;
-    /** Constructor for integers */
 
-    /** Constructor for Booleans */
-    Data(String s) { type = s; isVector = false; }
+    private boolean isShared;
+
+    Data(String s) { type = s; isVector = false; isShared = true; }
 
     /** Copy constructor */
-    Data(Data d) { type = d.type; isVector = d.isVector; }
+    Data(Data d) { type = d.type; isVector = d.isVector; isShared = d.isShared; } //this must be checked
 
     /** Returns the type of data */
     public String getType() { return type; }
@@ -69,7 +69,10 @@ public class Data {
 
     /** Indicates whether the data is a vector */
     public boolean isVector() { return isVector; }
-  
+ 
+    public boolean isShared() { return isShared; }
+    
+    public void setShared(boolean value) { isShared = value; }
 
     /** Indicates whether the data is a vector */
     public void setVector() { isVector = true; }
