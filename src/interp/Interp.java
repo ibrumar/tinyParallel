@@ -440,7 +440,7 @@ public class Interp {
             
             	generateExpression(forCompa);
             	
-            	System.out.print(";");
+            	System.out.print(" ; ");
             	  	
 		AslTree forPlus = t.getChild(2);
 		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
