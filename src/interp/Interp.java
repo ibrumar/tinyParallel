@@ -97,9 +97,10 @@ public class Interp {
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
+            //System.out.println("The name of the function is" + funcNameStr);
             if (funcNameStr.equals("main")) generateFunction("main");
             else {
-                System.out.println("Help" + funcNameStr);
+       //         System.out.println("Help" + funcNameStr);
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
                 generateFunction(funcNameStr);
             }
@@ -127,9 +128,11 @@ public class Interp {
         int i = 0;
         boolean foundMain = false;
         while (i < n && !(foundMain)) {
+            //System.out.println("iter " + i + " with n = " + n);
             AslTree f = T.getChild(i);
             //assert f.getType() == AslLexer.FUNC; //IF f.getType != FUNC -> exception
-            foundMain = !(f.getType() == AslLexer.FUNC);
+            foundMain = (f.getType() == AslLexer.MAIN);
+            //System.out.println("f's type is " + f.getType());
             if (!foundMain) {
                 String fname = f.getText(); //ID
                 if (FuncName2Tree.containsKey(fname)) {
@@ -234,7 +237,7 @@ public class Interp {
         System.out.println (") {");
         // Execute the instructions
         Data result = generateListInstructions (f.getChild(2));
-        System.out.print ("}");
+        System.out.println ("}");
 
         // If the result is null, then the function returns void
         if (result == null) result = new Data("void");
@@ -255,6 +258,7 @@ public class Interp {
      */
     private Data generateListInstructions (AslTree t) {
         assert t != null;
+        assert t.getType() == AslLexer.INSTR_BLOCK;
         Data result = null;
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
@@ -264,7 +268,8 @@ public class Interp {
     }
   
     private void checkParamsArgs(AslTree paramsNode, Data typeArg, int numArg) {
-        if (typeArg.getType() != paramsNode.getChild(numArg).getText())
+        //System.out.println("type arg is " + typeArg.getType() + "and type param is "+ paramsNode.getChild(numArg).getText());
+        if (!typeArg.getType().equals(paramsNode.getChild(numArg).getText()))
             throw new RuntimeException ("The type of the argument " + numArg + " doesn't match to its corresponding parameter");
             
     }
@@ -451,7 +456,9 @@ public class Interp {
             	
             case AslLexer.RETURN:
                 if (t.getChildCount() != 0) {
+                    System.out.print("return ");
                     generateExpression(t.getChild(0));
+                    System.out.println(";");
                 }
                 return; // No expression: returns void data
 
@@ -460,7 +467,7 @@ public class Interp {
             case AslLexer.READ:
                 String varName = t.getChild(0).getText();
                 Stack.checkVariableExists(varName);
-                System.out.print("cin >> "+ varName + ";");
+                System.out.println("cin >> "+ varName + ";");
                 return;
 
             // Write statement: it can write an expression or a string.
