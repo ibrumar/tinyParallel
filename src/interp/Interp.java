@@ -65,6 +65,11 @@ public class Interp {
     /** Nested levels of function calls. */
     private int function_nesting = -1;
     
+    /** Says if the compilation is done in a parallel region */
+    private boolean inParallelRegion = false;
+
+    /** Says if the compilation is done in notSync region */
+    private boolean inNotSyncRegion = false;
     /**
      * Constructor of the interpreter. It prepares the main
      * data structures for the execution of the main program.
@@ -317,6 +322,46 @@ public class Interp {
     }
 
 
+    void generateParallelZone(AslTree t) {
+        /** Says if the compilation is done in a parallel region */
+        if (inParallelRegion)
+            throw new RuntimeException ("\n Opening a parallel region inside another parallel region it's not permited\n" );
+        inParallelRegion = true;
+        String parallelZoneHeader = "#pragma omp parallel";
+        
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+            
+            AslTree privateVarNode = t.getChild(0);
+            
+            parallelZoneHeader += " private("; //there must be at least one private var
+            boolean first = true; 
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+                thePrivateVar.setShared(false);
+                if (first) first = false;
+                else parallelZoneHeader += ", " +  privateVarNode.getChild(i).getText();
+            }
+            parallelZoneHeader += ")";
+            System.out.println (parallelZoneHeader);
+        } 
+        
+        System.out.println ("{");
+        generateListInstructions(t.getChild(1));
+        System.out.println ("\n}");
+        
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+            
+            AslTree privateVarNode = t.getChild(0);
+
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+                thePrivateVar.setShared(true);
+            }
+        }
+        // you must take care because the variables declared inside the parallel zone must die
+        inParallelRegion = false;
+    }
+
 
     /**
      * Executes an instruction. 
@@ -334,6 +379,12 @@ public class Interp {
         // A big switch for all type of instructions
         switch (t.getType()) {
 
+            case AslLexer.BEGIN_PARALLEL:
+            {
+                generateParallelZone(t);
+                return;
+            }
+            
             // Assignment
             case AslLexer.ASSIGN:
             {
@@ -343,6 +394,8 @@ public class Interp {
                 Data toChange;
                 if (identNode.getType() != AslLexer.OPENC) {
                     toChange = Stack.getVariable(identNode.getText());
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
+                        System.out.println("#pragma omp critical");
                     System.out.print(identNode.getText() + " = ");
                 }
                 else {
@@ -368,6 +421,7 @@ public class Interp {
                 AslTree identNode = t.getChild(1);
                 AslTree typeNode = t.getChild(0);
                 Data value = new Data(typeNode.getText());
+                if (inParallelRegion) value.setShared(false);
 
                 if (identNode.getType() == AslLexer.OPENC) {
                     String vectorType = "vector<" + typeNode.getText() + "> ";

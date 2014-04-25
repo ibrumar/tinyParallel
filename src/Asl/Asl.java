@@ -123,7 +123,7 @@ public class Asl{
                 I.Run();                  // Executes the code
             } catch (RuntimeException e) {
                 if (I != null) linenumber = I.lineNumber();
-                System.err.print ("Runtime error");
+                System.err.print ("\nRuntime error");
                 if (linenumber < 0) System.err.print (": ");
                 else System.err.print (" (" + infile + ", line " + linenumber + "): ");
                 System.err.println (e.getMessage() + ".");
