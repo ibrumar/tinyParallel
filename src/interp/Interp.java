@@ -263,6 +263,9 @@ public class Interp {
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
             generateInstruction (t.getChild(i));
+            if (t.getChild(i).getType() == AslLexer.ASSIGN){
+            	System.out.println(";");
+            }
         }
         return null;
     }
@@ -355,7 +358,7 @@ public class Interp {
                 if (!value.getType().equals(toChange.getType()))
                     throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
 
-                System.out.print(";\n");
+               // System.out.print(";\n");
                 return;
 
             }
@@ -429,6 +432,8 @@ public class Interp {
 		Data variant = Stack.getVariable(varBoucle);
 		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
 		generateInstruction(t.getChild(0));
+		
+		System.out.print(" ; ");
 		
 		/*header - parte increment*/
 		AslTree forCompa = t.getChild(1);
