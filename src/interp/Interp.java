@@ -330,7 +330,7 @@ public class Interp {
             
             AslTree privateVarNode = t.getChild(0);
             
-            parallelZoneHeader += " private(" + privateVarNode.getChild(0); //there must be at least one private var
+            parallelZoneHeader += " private("; //there must be at least one private var
             boolean first = true; 
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
@@ -391,6 +391,8 @@ public class Interp {
                 Data toChange;
                 if (identNode.getType() != AslLexer.OPENC) {
                     toChange = Stack.getVariable(identNode.getText());
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
+                        System.out.println("#pragma omp critical");
                     System.out.print(identNode.getText() + " = ");
                 }
                 else {
@@ -416,6 +418,7 @@ public class Interp {
                 AslTree identNode = t.getChild(1);
                 AslTree typeNode = t.getChild(0);
                 Data value = new Data(typeNode.getText());
+                if (inParallelRegion) value.setShared(false);
 
                 if (identNode.getType() == AslLexer.OPENC) {
                     String vectorType = "vector<" + typeNode.getText() + "> ";
