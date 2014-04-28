@@ -96,18 +96,27 @@ public class Interp {
         //Basic initializations
         System.out.println("#include <iostream>");
         System.out.println("#include <vector>");
+        System.out.println("#include <omp.h>");
         System.out.println("using namespace std;");
 
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
+            Boolean hasReferenceParams = new Boolean(false);
             //System.out.println("The name of the function is" + funcNameStr);
-            if (funcNameStr.equals("main")) generateFunction("main");
+            if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams);
             else {
        //         System.out.println("Help" + funcNameStr);
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
-                generateFunction(funcNameStr);
+                inParallelRegion = false;
+                generateFunction(funcNameStr, hasReferenceParams);
+                if (hasReferenceParams.booleanValue()) {
+                    inParallelRegion = true;
+                    generateFunction(funcNameStr + "$$", hasReferenceParams);
+                    inParallelRegion = false;
+                    
+                }
             }
         }
         
@@ -190,7 +199,7 @@ public class Interp {
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
-      private Data generateFunction (String funcnameArg) {
+      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -228,6 +237,7 @@ public class Interp {
             System.out.print(param_type + " ");
             
             if (AslLexer.PREF == paramNode.getChild(0).getType()) {
+                hasReferenceParams = new Boolean(true);
                 System.out.print("&");
             }
             
@@ -336,7 +346,8 @@ public class Interp {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
                 thePrivateVar.setShared(false);
                 if (first) first = false;
-                else parallelZoneHeader += ", " +  privateVarNode.getChild(i).getText();
+                else parallelZoneHeader += ", ";
+                parallelZoneHeader += privateVarNode.getChild(i).getText();
             }
             parallelZoneHeader += ")";
             System.out.println (parallelZoneHeader);
@@ -379,6 +390,22 @@ public class Interp {
             case AslLexer.BEGIN_PARALLEL:
             {
                 generateParallelZone(t);
+                return;
+            }
+
+            case AslLexer.NOT_SYNC:
+            {
+                if (!inParallelRegion) {
+                    System.err.print ("Warning: Using a not_sync outside a parallel region is useless ");
+                    System.err.println ("because there is no synchronization needed in serial code:"+ lineNumber());
+                }
+                else if (inNotSyncRegion) 
+                    System.err.println ("Warning: Using a not_sync inside a not_sync is useless:"+ lineNumber());
+                else {
+                    inNotSyncRegion = true;
+                }
+                generateListInstructions(t.getChild(0));
+                inNotSyncRegion = false;
                 return;
             }
             
@@ -440,25 +467,12 @@ public class Interp {
             }
             case AslLexer.IF:
             {
-            	System.out.print("if (");
-            	
-            	Data value = generateExpression(t.getChild(0));
-              
+                Data value = generateExpression(t.getChild(0));
                 checkBoolean(value);
                 
-                System.out.println(") {");
-                
                 generateListInstructions(t.getChild(1));
-                
-                System.out.println("}");
-                
-                if (t.getChildCount() == 3){ 
-                //test of the presence of else statement
-                System.out.println("else {");
+                // Is there else statement ?
                 generateListInstructions(t.getChild(2));
-                System.out.println("}");
-                }
-                
                 return;
             }
             // While
@@ -472,42 +486,6 @@ public class Interp {
                 }*/
 
             // Return
-            
-            
-              case AslLexer.FOR:
-           	
-           	System.out.print("for (");
-           	
-		/* header - parte assignation del variant*/
-		String varBoucle = t.getChild(0).getChild(0).getText();
-		Data variant = Stack.getVariable(varBoucle);
-		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
-		generateInstruction(t.getChild(0));
-		
-		/*header - parte increment*/
-		AslTree forCompa = t.getChild(1);
-		
-            	if (forCompa.getType() != AslLexer.LE &&
-            		forCompa.getType() != AslLexer.LT &&
-            		forCompa.getType() != AslLexer.GE &&
-            		forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
-            
-            	generateExpression(forCompa);
-            	
-            	System.out.print(" ; ");
-            	  	
-		AslTree forPlus = t.getChild(2);
-		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
-            	generateInstruction(forPlus);
-            	
-            	System.out.println(") {");
-            	
-            	//instructions in the for
-            	generateListInstructions(t.getChild(3));
-            	
-            	System.out.println("}");
-            	return;
-            	
             case AslLexer.RETURN:
                 if (t.getChildCount() != 0) {
                     System.out.print("return ");
@@ -567,7 +545,7 @@ public class Interp {
         int previous_line = lineNumber();
         setLineNumber(t);
         int type = t.getType();
-        
+
         Data value = null;
         // Atoms
         switch (type) {
@@ -674,10 +652,7 @@ public class Interp {
                 value = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
-                
-                /*System.out.println ("ousti"+value.getType());
-                System.out.println ("ousti2"+value2.getType());*/
-                if (! value.getType().equals(value2.getType())) {
+                if (value.getType() != value2.getType()) {
                   throw new RuntimeException ("Incompatible types in relational expression");
                 }
                 break;
