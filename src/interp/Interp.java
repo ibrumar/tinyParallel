@@ -337,7 +337,7 @@ public class Interp {
         if (inParallelRegion)
             throw new RuntimeException ("\n Opening a parallel region inside another parallel region it's not permited\n" );
         inParallelRegion = true;
-        String parallelZoneHeader = "#pragma omp parallel";
+        String parallelZoneHeader = "#pragma omp parallel default(shared)";
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
@@ -348,6 +348,9 @@ public class Interp {
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
                 thePrivateVar.setShared(false);
+                if (thePrivateVar.isVector())
+                    throw new RuntimeException ("The arrays in tiny-parallel language can't be privatized");
+                
                 if (first) first = false;
                 else parallelZoneHeader += ", ";
                 parallelZoneHeader += privateVarNode.getChild(i).getText();
@@ -401,14 +404,18 @@ public class Interp {
                 if (!inParallelRegion) {
                     System.err.print ("Warning: Using a not_sync outside a parallel region is useless ");
                     System.err.println ("because there is no synchronization needed in serial code:"+ lineNumber());
+                    System.err.println ("Warning: The whole not sync with its code has been skipped");
                 }
-                else if (inNotSyncRegion) 
+                else if (inNotSyncRegion) { 
                     System.err.println ("Warning: Using a not_sync inside a not_sync is useless:"+ lineNumber());
+                    System.err.println ("Warning: The whole not sync with its code has been skipped");
+                
+                }
                 else {
                     inNotSyncRegion = true;
+                    generateListInstructions(t.getChild(0));
+                    inNotSyncRegion = false;
                 }
-                generateListInstructions(t.getChild(0));
-                inNotSyncRegion = false;
                 return;
             }
             
@@ -428,6 +435,9 @@ public class Interp {
                 else {
                     toChange = Stack.getVariable(identNode.getChild(0).getText());
                     checkVector(toChange);
+                    
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
+                        System.out.println("#pragma omp critical");
                     
                     System.out.print(identNode.getChild(0).getText() + "[");
                     Data vectorIndex = generateExpression(identNode.getChild(1));
