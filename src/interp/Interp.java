@@ -278,6 +278,9 @@ public class Interp {
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
             generateInstruction (t.getChild(i));
+            if (t.getChild(i).getType() == AslLexer.ASSIGN){
+            	System.out.println(";");
+            }
         }
         return null;
     }
@@ -435,7 +438,7 @@ public class Interp {
                 if (!value.getType().equals(toChange.getType()))
                     throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
 
-                System.out.print(";\n");
+               // System.out.print(";\n");
                 return;
 
             }
@@ -486,6 +489,45 @@ public class Interp {
                 }*/
 
             // Return
+
+            
+            
+              case AslLexer.FOR:
+           	
+           	System.out.print("for (");
+           	
+		/* header - parte assignation del variant*/
+		String varBoucle = t.getChild(0).getChild(0).getText();
+		Data variant = Stack.getVariable(varBoucle);
+		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
+		generateInstruction(t.getChild(0));
+		
+		System.out.print(" ; ");
+		
+		/*header - parte increment*/
+		AslTree forCompa = t.getChild(1);
+		
+            	if (forCompa.getType() != AslLexer.LE &&
+            		forCompa.getType() != AslLexer.LT &&
+            		forCompa.getType() != AslLexer.GE &&
+            		forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
+            
+            	generateExpression(forCompa);
+            	
+            	System.out.print(" ; ");
+            	  	
+		AslTree forPlus = t.getChild(2);
+		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
+            	generateInstruction(forPlus);
+            	
+            	System.out.println(") {");
+            	
+            	//instructions in the for
+            	generateListInstructions(t.getChild(3));
+            	
+            	System.out.println("}");
+            	return;
+            	
             case AslLexer.RETURN:
                 if (t.getChildCount() != 0) {
                     System.out.print("return ");
