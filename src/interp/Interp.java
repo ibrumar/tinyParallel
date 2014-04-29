@@ -92,7 +92,7 @@ public class Interp {
         function_nesting = -1;
     }
     /** Runs the program by calling the main function without parameters. */
-    public void Run() {
+    public void Run() throws ParallelException {
         //Basic initializations
         System.out.println("#include <iostream>");
         System.out.println("#include <vector>");
@@ -184,13 +184,12 @@ public class Interp {
     private void setLineNumber(int l) { linenumber = l;}
 
 
-    
     /**
      * Executes a function.
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
-      private Data generateFunction (String funcnameArg) {
+      private Data generateFunction (String funcnameArg) throws ParallelException {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -261,7 +260,7 @@ public class Interp {
      * @return The data returned by the instructions (null if no return
      * statement has been executed).
      */
-    private Data generateListInstructions (AslTree t) {
+    private Data generateListInstructions (AslTree t) throws ParallelException {
         assert t != null;
         assert t.getType() == AslLexer.INSTR_BLOCK;
         Data result = null;
@@ -276,10 +275,8 @@ public class Interp {
     }
   
     private void checkParamsArgs(AslTree paramsNode, Data typeArg, int numArg) {
-        //System.out.println("type arg is " + typeArg.getType() + "and type param is "+ paramsNode.getChild(numArg).getText());
         if (!typeArg.getType().equals(paramsNode.getChild(numArg).getText()))
-            throw new RuntimeException ("The type of the argument " + numArg + " doesn't match to its corresponding parameter");
-            
+            throw new RuntimeException ("The type of the argument " + numArg + " doesn't match to its corresponding parameter");       
     }
 
     /*Generates the func call with all the necessary checks
@@ -322,19 +319,23 @@ public class Interp {
     }
 
 
-    void generateParallelZone(AslTree t) {
-        /** Says if the compilation is done in a parallel region */
+    void generateParallelZone(AslTree t) throws ParallelException {
+    
+        /** Says if the compilation is already done in a parallel region and give exception in this case*/
         if (inParallelRegion)
-            throw new RuntimeException ("\n Opening a parallel region inside another parallel region it's not permited\n" );
+            throw new ParallelException ();
+            
+            
+        // in the other case, we create the zone
         inParallelRegion = true;
         String parallelZoneHeader = "#pragma omp parallel";
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
             AslTree privateVarNode = t.getChild(0);
-            
             parallelZoneHeader += " private("; //there must be at least one private var
             boolean first = true; 
+           
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
                 thePrivateVar.setShared(false);
@@ -363,6 +364,48 @@ public class Interp {
     }
 
 
+
+    // Function to generate the header of the for and the for parallel (there is the same, that's why this funcion exists)
+    private void generateHeaderFor(AslTree t) throws ParallelException{
+        
+        System.out.print("for (");
+           	
+        /* header - parte assignation del variant*/
+		
+        String varBoucle = t.getChild(0).getChild(0).getText();
+		
+        Data variant = Stack.getVariable(varBoucle);
+		
+        if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
+		
+        generateInstruction(t.getChild(0));
+		
+        System.out.print(" ; ");
+		
+		
+        /*header - parte increment*/
+        AslTree forCompa = t.getChild(1);
+		
+        if (forCompa.getType() != AslLexer.LE &&
+            forCompa.getType() != AslLexer.LT &&
+            forCompa.getType() != AslLexer.GE &&
+            forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
+            
+        generateExpression(forCompa);
+            	
+        System.out.print(" ; ");
+            	  	
+        AslTree forPlus = t.getChild(2);
+		
+        if (forPlus.getType() != AslLexer.ASSIGN)
+		    throw new RuntimeException ("Must be assignation for a boucle for"); 
+        
+        generateInstruction(forPlus);
+            	
+        System.out.println(") {");
+        
+    }
+
     /**
      * Executes an instruction. 
      * Non-null results are only returned by "return" statements.
@@ -371,7 +414,7 @@ public class Interp {
      * non-null only if a return statement is executed or a block
      * of instructions executing a return.
      */
-    private void generateInstruction (AslTree t) {
+    private void generateInstruction (AslTree t) throws ParallelException {
         assert t != null;
         
         setLineNumber(t);
@@ -392,12 +435,14 @@ public class Interp {
                 AslTree identNode = t.getChild(0);
                 AslTree exprNode = t.getChild(1);
                 Data toChange;
+                
                 if (identNode.getType() != AslLexer.OPENC) {
                     toChange = Stack.getVariable(identNode.getText());
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
                         System.out.println("#pragma omp critical");
                     System.out.print(identNode.getText() + " = ");
                 }
+                
                 else {
                     toChange = Stack.getVariable(identNode.getChild(0).getText());
                     checkVector(toChange);
@@ -407,20 +452,23 @@ public class Interp {
                     System.out.print("] = ");
 
                 }
+                
                 Data value = generateExpression(exprNode);
+                
                 if (!value.getType().equals(toChange.getType()))
                     throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
 
-               // System.out.print(";\n");
                 return;
-
             }
-            // If-then-else
+            
+            
+            // Declaration statement
             case AslLexer.DECL:
             {
                 AslTree identNode = t.getChild(1);
                 AslTree typeNode = t.getChild(0);
                 Data value = new Data(typeNode.getText());
+                
                 if (inParallelRegion) value.setShared(false);
 
                 if (identNode.getType() == AslLexer.OPENC) {
@@ -441,11 +489,14 @@ public class Interp {
                 }
                 return;
             }
+            
+            
+            // If - else statement
             case AslLexer.IF:
             {
-            	System.out.print("if (");
+                System.out.print("if (");
             	
-            	Data value = generateExpression(t.getChild(0));
+                Data value = generateExpression(t.getChild(0));
               
                 checkBoolean(value);
                 
@@ -455,8 +506,7 @@ public class Interp {
                 
                 System.out.println("}");
                 
-                if (t.getChildCount() == 3){ 
-                //test of the presence of else statement
+                if (t.getChildCount() == 3){//test of the presence of else statement
                 System.out.println("else {");
                 generateListInstructions(t.getChild(2));
                 System.out.println("}");
@@ -476,51 +526,49 @@ public class Interp {
 
             // Return
             
-            
               case AslLexer.FOR:
-           	
-           	System.out.print("for (");
-           	
-		/* header - parte assignation del variant*/
-		String varBoucle = t.getChild(0).getChild(0).getText();
-		Data variant = Stack.getVariable(varBoucle);
-		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
-		generateInstruction(t.getChild(0));
-		
-		System.out.print(" ; ");
-		
-		/*header - parte increment*/
-		AslTree forCompa = t.getChild(1);
-		
-            	if (forCompa.getType() != AslLexer.LE &&
-            		forCompa.getType() != AslLexer.LT &&
-            		forCompa.getType() != AslLexer.GE &&
-            		forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
-            
-            	generateExpression(forCompa);
-            	
-            	System.out.print(" ; ");
-            	  	
-		AslTree forPlus = t.getChild(2);
-		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
-            	generateInstruction(forPlus);
-            	
-            	System.out.println(") {");
+              {
+                //header
+                generateHeaderFor(t);
             	
             	//instructions in the for
-            	generateListInstructions(t.getChild(3));
+                generateListInstructions(t.getChild(3));
             	
-            	System.out.println("}");
+                System.out.println("}");
             	return;
-            	
+              }
+            
+            
+            // Parallel for statement 
+            case AslLexer.PARALLEL_FOR:
+            {
+                //test error if you are not yet in a parallel zone
+                if(!inParallelRegion) throw new ParallelException(); 
+                
+                //print del pragma
+                System.out.println("#pragma omp for");
+                
+                //gestion de private/shared by instructions/expressiones
+                
+                /*Header del for*/
+                generateHeaderFor(t);
+                /*Cuerpo del for*/
+                generateListInstructions(t.getChild(3));    
+                return;
+            }
+            
+            // Return statement
             case AslLexer.RETURN:
+            {
                 if (t.getChildCount() != 0) {
                     System.out.print("return ");
                     generateExpression(t.getChild(0));
                     System.out.println(";");
                 }
                 return; // No expression: returns void data
-
+            }
+            
+            
             // Read statement: reads a variable and raises an exception
             // in case of a format error.
             case AslLexer.READ:
@@ -528,6 +576,7 @@ public class Interp {
                 Stack.checkVariableExists(varName);
                 System.out.println("cin >> "+ varName + ";");
                 return;
+
 
             // Write statement: it can write an expression or a string.
             case AslLexer.WRITE:
@@ -544,6 +593,7 @@ public class Interp {
                     System.out.println(";");
                     return;
                 }
+
 
             // Function call
             case AslLexer.FUNCALL:
@@ -677,14 +727,15 @@ public class Interp {
             case AslLexer.GE:
                 //given that c permits boolean comparison we do too
                 value = generateExpression(t.getChild(0));
+              
                 System.out.print(" " + t.getText() + " ");
+          
                 value2 = generateExpression(t.getChild(1));
                 
-                /*System.out.println ("ousti"+value.getType());
-                System.out.println ("ousti2"+value2.getType());*/
                 if (! value.getType().equals(value2.getType())) {
-                  throw new RuntimeException ("Incompatible types in relational expression");
+                    throw new RuntimeException ("Incompatible types in relational expression");
                 }
+                
                 break;
 
             // Arithmetic operators
@@ -697,6 +748,7 @@ public class Interp {
                 value = generateExpression(t.getChild(0));
                 System.out.print(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1));
+             
                 if (!value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in arithmetic expression");
                 }
