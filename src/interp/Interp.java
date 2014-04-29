@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
 import java.util.Iterator;
+import java.lang.StringBuilder;
 import java.util.Set;
 import java.io.*;
 
@@ -94,32 +95,40 @@ public class Interp {
     /** Runs the program by calling the main function without parameters. */
     public void Run() {
         //Basic initializations
-        System.out.println("#include <iostream>");
-        System.out.println("#include <vector>");
-        System.out.println("#include <omp.h>");
-        System.out.println("using namespace std;");
+        StringBuilder genCode = new StringBuilder();
+        genCode.append("#include <iostream>" + "\n");
+        genCode.append("#include <vector>" + "\n");
+        genCode.append("#include <omp.h>" + "\n");
+        genCode.append("using namespace std;" + "\n");
 
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
             Boolean hasReferenceParams = new Boolean(false);
-            //System.out.println("The name of the function is" + funcNameStr);
-            if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams);
+            //genCode.append("The name of the function is" + funcNameStr + "\n");
+            StringBuilder generatedFunctionCode = new StringBuilder();
+            
+            boolean funcGenerated = true;
+            //try {
+            if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams, generatedFunctionCode);
             else {
-       //         System.out.println("Help" + funcNameStr);
+       //       genCode.append("Help" + funcNameStr + "\n");
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
                 inParallelRegion = false;
-                generateFunction(funcNameStr, hasReferenceParams);
+                generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
                 if (hasReferenceParams.booleanValue()) {
                     inParallelRegion = true;
-                    generateFunction(funcNameStr + "$$", hasReferenceParams);
+                    generateFunction(funcNameStr + "$$", hasReferenceParams, generatedFunctionCode);
                     inParallelRegion = false;
-                    
                 }
             }
+            //} catch (ParallelException) {funcGenerated = false; }
+            //if (funcGenerated) genCode.append(generatedFunctionCode);
+            genCode.append(generatedFunctionCode);
+
         }
-        
+        System.out.println(genCode); 
     }
     
 
@@ -142,11 +151,11 @@ public class Interp {
         int i = 0;
         boolean foundMain = false;
         while (i < n && !(foundMain)) {
-            //System.out.println("iter " + i + " with n = " + n);
+            //genCode.append("iter " + i + " with n = " + n + "\n");
             AslTree f = T.getChild(i);
             //assert f.getType() == AslLexer.FUNC; //IF f.getType != FUNC -> exception
             foundMain = (f.getType() == AslLexer.MAIN);
-            //System.out.println("f's type is " + f.getType());
+            //genCode.append("f's type is " + f.getType() + "\n");
             if (!foundMain) {
                 String fname = f.getText(); //ID
                 if (FuncName2Tree.containsKey(fname)) {
@@ -199,7 +208,7 @@ public class Interp {
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
-      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) {
+      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams, StringBuilder genCode) {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -209,14 +218,14 @@ public class Interp {
         String funcName = f.getText();
 
         switch (returnType.getType()) {
-            case AslLexer.INT: System.out.print("int "); break;
-            case AslLexer.BOOL: System.out.print("bool "); break;
+            case AslLexer.INT: genCode.append("int "); break;
+            case AslLexer.BOOL: genCode.append("bool "); break;
             default: throw new RuntimeException("Not a recognized return type");
         }
         
         //we use funcnameArg because in the case of the main
         //in the tree we have a MAIN imaginary token not "main"
-        System.out.print(funcnameArg + " (");
+        genCode.append(funcnameArg + " (");
 
         
         // List of parameters of the callee
@@ -234,25 +243,25 @@ public class Interp {
             AslTree paramNode = p.getChild(i);
            
             String param_type = paramNode.getText();
-            System.out.print(param_type + " ");
+            genCode.append(param_type + " ");
             
             if (AslLexer.PREF == paramNode.getChild(0).getType()) {
                 hasReferenceParams = new Boolean(true);
-                System.out.print("&");
+                genCode.append("&");
             }
             
             String param_name = paramNode.getChild(0).getText();
-            System.out.print(param_name);
+            genCode.append(param_name);
             if (i < nparam-1) {
-                System.out.print(", ");
+                genCode.append(", ");
             }
             Stack.defineVariable(param_name, new Data(paramNode.getText()));
         }
 
-        System.out.println (") {");
+        genCode.append(") {" + "\n");
         // Execute the instructions
-        Data result = generateListInstructions (f.getChild(2));
-        System.out.println ("}");
+        Data result = generateListInstructions(f.getChild(2), genCode);
+        genCode.append("}" + "\n");
 
         // If the result is null, then the function returns void
         if (result == null) result = new Data("void");
@@ -271,22 +280,22 @@ public class Interp {
      * @return The data returned by the instructions (null if no return
      * statement has been executed).
      */
-    private Data generateListInstructions (AslTree t) {
+    private Data generateListInstructions (AslTree t, StringBuilder genCode) {
         assert t != null;
         assert t.getType() == AslLexer.INSTR_BLOCK;
         Data result = null;
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
-            generateInstruction (t.getChild(i));
+            generateInstruction (t.getChild(i), genCode);
             if (t.getChild(i).getType() == AslLexer.ASSIGN){
-            	System.out.println(";");
+            	genCode.append(";" + "\n");
             }
         }
         return null;
     }
   
     private void checkParamsArgs(AslTree paramsNode, Data typeArg, int numArg) {
-        //System.out.println("type arg is " + typeArg.getType() + "and type param is "+ paramsNode.getChild(numArg).getText());
+        //genCode.append("type arg is " + typeArg.getType() + "and type param is "+ paramsNode.getChild(numArg).getText() + "\n");
         if (!typeArg.getType().equals(paramsNode.getChild(numArg).getText()))
             throw new RuntimeException ("The type of the argument " + numArg + " doesn't match to its corresponding parameter");
             
@@ -296,7 +305,7 @@ public class Interp {
       We do a special function because a function call can be done from generateInstruction
       as well as from generateExpression
     */
-    private Data generateFuncall(AslTree t) {
+    private Data generateFuncall(AslTree t, StringBuilder genCode) {
         String funcName = t.getChild(0).getText();
         if (!FuncName2Tree.containsKey(funcName))
             throw new RuntimeException ("Call to unexisting function "+ funcName );
@@ -310,12 +319,12 @@ public class Interp {
         if (numArgs != numParams)
             throw new RuntimeException ("Number of arguments doesn't match the number of parameters in"+ funcName );
         
-        System.out.print(funcName + "(");
+        genCode.append(funcName + "(");
         boolean firstIter = true;
         
         for (int i = 0; i < numArgs; ++i) {
             if (firstIter) firstIter = false;
-            else System.out.print(", ");
+            else genCode.append(", ");
             
             AslTree a = args.getChild(i);
             AslTree p = paramsNode.getChild(i);
@@ -323,16 +332,16 @@ public class Interp {
                 throw new RuntimeException ("Argument " + i + "must be an identifier. The corresponding parameter is reference passed");
             
             setLineNumber(a);
-            Data res = generateExpression(a);
+            Data res = generateExpression(a, genCode);
             checkParamsArgs(paramsNode, res, i);
         }
         Data value = new Data(functionTree.getChild(0).getText()); //this tells you the type returned
-        System.out.println(");");
+        genCode.append(");" + "\n");
         return value;
     }
 
 
-    void generateParallelZone(AslTree t) {
+    void generateParallelZone(AslTree t, StringBuilder genCode) {
         /** Says if the compilation is done in a parallel region */
         if (inParallelRegion)
             throw new RuntimeException ("\n Opening a parallel region inside another parallel region it's not permited\n" );
@@ -356,12 +365,12 @@ public class Interp {
                 parallelZoneHeader += privateVarNode.getChild(i).getText();
             }
             parallelZoneHeader += ")";
-            System.out.println (parallelZoneHeader);
+            genCode.append(parallelZoneHeader + "\n");
         } 
         
-        System.out.println ("{");
-        generateListInstructions(t.getChild(1));
-        System.out.println ("\n}");
+        genCode.append("{" + "\n");
+        generateListInstructions(t.getChild(1), genCode);
+        genCode.append("\n}" + "\n");
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
@@ -385,7 +394,7 @@ public class Interp {
      * non-null only if a return statement is executed or a block
      * of instructions executing a return.
      */
-    private void generateInstruction (AslTree t) {
+    private void generateInstruction (AslTree t, StringBuilder genCode) {
         assert t != null;
         
         setLineNumber(t);
@@ -395,7 +404,7 @@ public class Interp {
 
             case AslLexer.BEGIN_PARALLEL:
             {
-                generateParallelZone(t);
+                generateParallelZone(t, genCode);
                 return;
             }
 
@@ -413,7 +422,7 @@ public class Interp {
                 }
                 else {
                     inNotSyncRegion = true;
-                    generateListInstructions(t.getChild(0));
+                    generateListInstructions(t.getChild(0), genCode);
                     inNotSyncRegion = false;
                 }
                 return;
@@ -429,26 +438,26 @@ public class Interp {
                 if (identNode.getType() != AslLexer.OPENC) {
                     toChange = Stack.getVariable(identNode.getText());
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
-                        System.out.println("#pragma omp critical");
-                    System.out.print(identNode.getText() + " = ");
+                        genCode.append("#pragma omp critical" + "\n");
+                    genCode.append(identNode.getText() + " = ");
                 }
                 else {
                     toChange = Stack.getVariable(identNode.getChild(0).getText());
                     checkVector(toChange);
                     
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
-                        System.out.println("#pragma omp critical");
+                        genCode.append("#pragma omp critical" + "\n");
                     
-                    System.out.print(identNode.getChild(0).getText() + "[");
-                    Data vectorIndex = generateExpression(identNode.getChild(1));
-                    System.out.print("] = ");
+                    genCode.append(identNode.getChild(0).getText() + "[");
+                    Data vectorIndex = generateExpression(identNode.getChild(1), genCode);
+                    genCode.append("] = ");
 
                 }
-                Data value = generateExpression(exprNode);
+                Data value = generateExpression(exprNode, genCode);
                 if (!value.getType().equals(toChange.getType()))
                     throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
 
-               // System.out.print(";\n");
+               // genCode.append(";\n");
                 return;
 
             }
@@ -462,10 +471,10 @@ public class Interp {
 
                 if (identNode.getType() == AslLexer.OPENC) {
                     String vectorType = "vector<" + typeNode.getText() + "> ";
-                    System.out.print( vectorType + identNode.getChild(0).getText());
-                    System.out.print(" = * new " + vectorType + "(");
-                    Data vectorIndex = generateExpression(identNode.getChild(1));
-                    System.out.println(", 0);"); //it fills all declared vectors with zeros
+                    genCode.append( vectorType + identNode.getChild(0).getText());
+                    genCode.append(" = * new " + vectorType + "(");
+                    Data vectorIndex = generateExpression(identNode.getChild(1), genCode);
+                    genCode.append(", 0);" + "\n"); //it fills all declared vectors with zeros
                     
                     checkInteger(vectorIndex);
                     
@@ -473,28 +482,28 @@ public class Interp {
                     Stack.defineVariable (identNode.getChild(0).getText(), value);
                 }
                 else {
-                    System.out.println(typeNode.getText() + " " + identNode.getText() + ";");//this won't work if working with
+                    genCode.append(typeNode.getText() + " " + identNode.getText() + ";" + "\n");//this won't work if working with
                     Stack.defineVariable (t.getChild(1).getText(), value);
                 }
                 return;
             }
             case AslLexer.IF:
             {
-                Data value = generateExpression(t.getChild(0));
+                Data value = generateExpression(t.getChild(0), genCode);
                 checkBoolean(value);
                 
-                generateListInstructions(t.getChild(1));
+                generateListInstructions(t.getChild(1), genCode);
                 // Is there else statement ?
-                generateListInstructions(t.getChild(2));
+                generateListInstructions(t.getChild(2), genCode);
                 return;
             }
             // While
            /* case AslLexer.WHILE:
                 while (true) {
-                    value = generateExpression(t.getChild(0));
+                    value = generateExpression(t.getChild(0), genCode);
                     checkBoolean(value);
                     if (!value.getBooleanValue()) return null;
-                    Data r = generateListInstructions(t.getChild(1));
+                    Data r = generateListInstructions(t.getChild(1), genCode);
                     if (r != null) return r;
                 }*/
 
@@ -504,15 +513,15 @@ public class Interp {
             
               case AslLexer.FOR:
            	
-           	System.out.print("for (");
+           	genCode.append("for (");
            	
 		/* header - parte assignation del variant*/
 		String varBoucle = t.getChild(0).getChild(0).getText();
 		Data variant = Stack.getVariable(varBoucle);
 		if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
-		generateInstruction(t.getChild(0));
+		generateInstruction(t.getChild(0), genCode);
 		
-		System.out.print(" ; ");
+		genCode.append(" ; ");
 		
 		/*header - parte increment*/
 		AslTree forCompa = t.getChild(1);
@@ -522,27 +531,27 @@ public class Interp {
             		forCompa.getType() != AslLexer.GE &&
             		forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
             
-            	generateExpression(forCompa);
+            	generateExpression(forCompa, genCode);
             	
-            	System.out.print(" ; ");
+            	genCode.append(" ; ");
             	  	
 		AslTree forPlus = t.getChild(2);
 		if (forPlus.getType() != AslLexer.ASSIGN) throw new RuntimeException ("Must be assignation for a boucle for"); 
-            	generateInstruction(forPlus);
+            	generateInstruction(forPlus, genCode);
             	
-            	System.out.println(") {");
+            	genCode.append(") {" + "\n");
             	
             	//instructions in the for
-            	generateListInstructions(t.getChild(3));
+            	generateListInstructions(t.getChild(3), genCode);
             	
-            	System.out.println("}");
+            	genCode.append("}" + "\n");
             	return;
             	
             case AslLexer.RETURN:
                 if (t.getChildCount() != 0) {
-                    System.out.print("return ");
-                    generateExpression(t.getChild(0));
-                    System.out.println(";");
+                    genCode.append("return ");
+                    generateExpression(t.getChild(0), genCode);
+                    genCode.append(";" + "\n");
                 }
                 return; // No expression: returns void data
 
@@ -551,7 +560,7 @@ public class Interp {
             case AslLexer.READ:
                 String varName = t.getChild(0).getText();
                 Stack.checkVariableExists(varName);
-                System.out.println("cin >> "+ varName + ";");
+                genCode.append("cin >> "+ varName + ";" + "\n");
                 return;
 
             // Write statement: it can write an expression or a string.
@@ -559,20 +568,20 @@ public class Interp {
                 AslTree v = t.getChild(0);
                 // Special case for strings
                 if (v.getType() == AslLexer.STRING) {
-                    System.out.println("cout << " + v.getText() + ";");
+                    genCode.append("cout << " + v.getText() + ";" + "\n");
                     return;
                 }
                 else {
                     // Write an expression
-                    System.out.print("cout << ");
-                    generateExpression(v);
-                    System.out.println(";");
+                    genCode.append("cout << ");
+                    generateExpression(v, genCode);
+                    genCode.append(";" + "\n");
                     return;
                 }
 
             // Function call
             case AslLexer.FUNCALL:
-                generateFuncall(t);
+                generateFuncall(t, genCode);
                 return;
 
             default: assert false; // Should never happen
@@ -588,10 +597,10 @@ public class Interp {
     /**
      * Evaluates the expression represented in the AST t.
      * @param t The AST of the expression
-     * @return The value of the expression.
+     * @return The type of the expression and the generated code "genCode".
      */
    
-    private Data generateExpression(AslTree t) {
+    private Data generateExpression(AslTree t, StringBuilder genCode) {
         assert t != null;
 
         int previous_line = lineNumber();
@@ -605,14 +614,14 @@ public class Interp {
             case AslLexer.ID:
                 value = new Data(Stack.getVariable(t.getText()));
                 //IF it hasn't returned an exception
-                System.out.print(t.getText());
+                genCode.append(t.getText());
                 break;
             // An integer literal
             case AslLexer.OPENC:
                 
-                System.out.print(t.getChild(0).getText() + "[");
-                Data vectorIndex = generateExpression(t.getChild(1));
-                System.out.print("]");
+                genCode.append(t.getChild(0).getText() + "[");
+                Data vectorIndex = generateExpression(t.getChild(1), genCode);
+                genCode.append("]");
                     
                 checkInteger(vectorIndex);
                     
@@ -623,13 +632,13 @@ public class Interp {
                 break; 
             case AslLexer.INTLIT:
                 value = new Data("int");
-                System.out.print(t.getText());
+                genCode.append(t.getText());
                 
                 break;
             // A Boolean literal
             case AslLexer.BOOLEAN:
                 value = new Data("bool");
-                System.out.print(t.getText());
+                genCode.append(t.getText());
 
                 break;
             // A function call. Checks that the function returns a result.
@@ -639,7 +648,7 @@ public class Interp {
                 /*if (value.isVoid()) {
                     throw new RuntimeException ("function expected to return a value");
                 }*/
-                    value = generateFuncall(t);
+                    value = generateFuncall(t, genCode);
                 break;
             default: break;
         }
@@ -655,20 +664,20 @@ public class Interp {
         if (t.getChildCount() == 1) {
             switch (type) {
                 case AslLexer.PLUS:
-                    System.out.print("+");
+                    genCode.append("+");
                     break;
                 case AslLexer.MINUS:
-                    System.out.print("-");
+                    genCode.append("-");
                     break;
                 case AslLexer.NOT:
-                    System.out.print("not");
+                    genCode.append("not");
                     break;
                 default: assert false; // Should never happen
             }
             setLineNumber(previous_line);
-            System.out.print("(");
-            value = generateExpression(t.getChild(0));
-            System.out.print(")");
+            genCode.append("(");
+            value = generateExpression(t.getChild(0), genCode);
+            genCode.append(")");
             
             
             switch (type) {
@@ -701,9 +710,9 @@ public class Interp {
             case AslLexer.GT:
             case AslLexer.GE:
                 //given that c permits boolean comparison we do too
-                value = generateExpression(t.getChild(0));
-                System.out.print(" " + t.getText() + " ");
-                value2 = generateExpression(t.getChild(1));
+                value = generateExpression(t.getChild(0), genCode);
+                genCode.append(" " + t.getText() + " ");
+                value2 = generateExpression(t.getChild(1), genCode);
                 if (value.getType() != value2.getType()) {
                   throw new RuntimeException ("Incompatible types in relational expression");
                 }
@@ -716,9 +725,9 @@ public class Interp {
             case AslLexer.DIV:
             case AslLexer.MOD:
              
-                value = generateExpression(t.getChild(0));
-                System.out.print(" " + t.getText() + " ");
-                value2 = generateExpression(t.getChild(1));
+                value = generateExpression(t.getChild(0), genCode);
+                genCode.append(" " + t.getText() + " ");
+                value2 = generateExpression(t.getChild(1), genCode);
                 if (!value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in arithmetic expression");
                 }
@@ -730,7 +739,7 @@ public class Interp {
             case AslLexer.OR:
                 // The first operand is evaluated, but the second
                 // is deferred (lazy, short-circuit evaluation).
-                value = evaluateBoolean(t);
+                value = evaluateBoolean(t, genCode);
                 break;
 
             default: assert false; // Should never happen
@@ -750,15 +759,15 @@ public class Interp {
      * @param t AST node of the second operand.
      * @return An Boolean data with the value of the expression.
      */
-    private Data evaluateBoolean (AslTree t) {
+    private Data evaluateBoolean (AslTree t, StringBuilder genCode) {
         // Boolean evaluation with short-circuit
 
-        Data leftOperandType = generateExpression(t.getChild(0));
+        Data leftOperandType = generateExpression(t.getChild(0), genCode);
         checkBoolean(leftOperandType);
-        System.out.print(" " + t.getText() + " ");
-        Data rightOperandType = generateExpression(t.getChild(1));
+        genCode.append(" " + t.getText() + " ");
+        Data rightOperandType = generateExpression(t.getChild(1), genCode);
         checkBoolean(rightOperandType);
-        System.out.println(";");
+        genCode.append(";" + "\n");
         return leftOperandType; //the type is the same
     }
 
