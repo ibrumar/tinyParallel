@@ -533,7 +533,7 @@ public class Interp {
             	
             	//instructions in the for
                 generateListInstructions(t.getChild(3));
-            	
+            	            	
                 System.out.println("}");
             	return;
               }
@@ -543,8 +543,10 @@ public class Interp {
             case AslLexer.PARALLEL_FOR:
             {
                 //test error if you are not yet in a parallel zone
-                if(!inParallelRegion) throw new ParallelException(); 
+               
                 
+                if(!inParallelRegion) throw new ParallelException(); 
+                      
                 //print del pragma
                 System.out.println("#pragma omp for");
                 

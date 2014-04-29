@@ -36,10 +36,7 @@ o = 92;
 
 
 
-begin_parallel
 
-private_var : k;
-{
 
 
 int ajub;
@@ -48,7 +45,7 @@ int t;
 int aaaaaa;
 int anonjunaue;
 }
-} end_parallel
+
 
 
 
