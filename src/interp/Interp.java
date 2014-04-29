@@ -96,18 +96,27 @@ public class Interp {
         //Basic initializations
         System.out.println("#include <iostream>");
         System.out.println("#include <vector>");
+        System.out.println("#include <omp.h>");
         System.out.println("using namespace std;");
 
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
+            Boolean hasReferenceParams = new Boolean(false);
             //System.out.println("The name of the function is" + funcNameStr);
-            if (funcNameStr.equals("main")) generateFunction("main");
+            if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams);
             else {
        //         System.out.println("Help" + funcNameStr);
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
-                generateFunction(funcNameStr);
+                inParallelRegion = false;
+                generateFunction(funcNameStr, hasReferenceParams);
+                if (hasReferenceParams.booleanValue()) {
+                    inParallelRegion = true;
+                    generateFunction(funcNameStr + "$$", hasReferenceParams);
+                    inParallelRegion = false;
+                    
+                }
             }
         }
         
@@ -189,7 +198,11 @@ public class Interp {
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
+<<<<<<< HEAD
       private Data generateFunction (String funcnameArg) throws ParallelException {
+=======
+      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) {
+>>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -227,6 +240,7 @@ public class Interp {
             System.out.print(param_type + " ");
             
             if (AslLexer.PREF == paramNode.getChild(0).getType()) {
+                hasReferenceParams = new Boolean(true);
                 System.out.print("&");
             }
             
@@ -328,7 +342,7 @@ public class Interp {
             
         // in the other case, we create the zone
         inParallelRegion = true;
-        String parallelZoneHeader = "#pragma omp parallel";
+        String parallelZoneHeader = "#pragma omp parallel default(shared)";
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
@@ -339,8 +353,12 @@ public class Interp {
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
                 thePrivateVar.setShared(false);
+                if (thePrivateVar.isVector())
+                    throw new RuntimeException ("The arrays in tiny-parallel language can't be privatized");
+                
                 if (first) first = false;
-                else parallelZoneHeader += ", " +  privateVarNode.getChild(i).getText();
+                else parallelZoneHeader += ", ";
+                parallelZoneHeader += privateVarNode.getChild(i).getText();
             }
             parallelZoneHeader += ")";
             System.out.println (parallelZoneHeader);
@@ -427,6 +445,26 @@ public class Interp {
                 generateParallelZone(t);
                 return;
             }
+
+            case AslLexer.NOT_SYNC:
+            {
+                if (!inParallelRegion) {
+                    System.err.print ("Warning: Using a not_sync outside a parallel region is useless ");
+                    System.err.println ("because there is no synchronization needed in serial code:"+ lineNumber());
+                    System.err.println ("Warning: The whole not sync with its code has been skipped");
+                }
+                else if (inNotSyncRegion) { 
+                    System.err.println ("Warning: Using a not_sync inside a not_sync is useless:"+ lineNumber());
+                    System.err.println ("Warning: The whole not sync with its code has been skipped");
+                
+                }
+                else {
+                    inNotSyncRegion = true;
+                    generateListInstructions(t.getChild(0));
+                    inNotSyncRegion = false;
+                }
+                return;
+            }
             
             // Assignment
             case AslLexer.ASSIGN:
@@ -446,6 +484,9 @@ public class Interp {
                 else {
                     toChange = Stack.getVariable(identNode.getChild(0).getText());
                     checkVector(toChange);
+                    
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
+                        System.out.println("#pragma omp critical");
                     
                     System.out.print(identNode.getChild(0).getText() + "[");
                     Data vectorIndex = generateExpression(identNode.getChild(1));
@@ -494,24 +535,27 @@ public class Interp {
             // If - else statement
             case AslLexer.IF:
             {
+<<<<<<< HEAD
                 System.out.print("if (");
             	
                 Data value = generateExpression(t.getChild(0));
               
+=======
+                Data value = generateExpression(t.getChild(0));
+>>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
                 checkBoolean(value);
                 
-                System.out.println(") {");
-                
                 generateListInstructions(t.getChild(1));
+<<<<<<< HEAD
                 
                 System.out.println("}");
                 
                 if (t.getChildCount() == 3){//test of the presence of else statement
                 System.out.println("else {");
+=======
+                // Is there else statement ?
+>>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
                 generateListInstructions(t.getChild(2));
-                System.out.println("}");
-                }
-                
                 return;
             }
             // While
@@ -525,6 +569,7 @@ public class Interp {
                 }*/
 
             // Return
+
             
               case AslLexer.FOR:
               {
@@ -624,7 +669,7 @@ public class Interp {
         int previous_line = lineNumber();
         setLineNumber(t);
         int type = t.getType();
-        
+
         Data value = null;
         // Atoms
         switch (type) {
@@ -733,9 +778,14 @@ public class Interp {
                 System.out.print(" " + t.getText() + " ");
           
                 value2 = generateExpression(t.getChild(1));
+<<<<<<< HEAD
                 
                 if (! value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in relational expression");
+=======
+                if (value.getType() != value2.getType()) {
+                  throw new RuntimeException ("Incompatible types in relational expression");
+>>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
                 }
                 
                 break;
