@@ -198,11 +198,11 @@ public class Interp {
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
-<<<<<<< HEAD
+
       private Data generateFunction (String funcnameArg) throws ParallelException {
-=======
+
       private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) {
->>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
+
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
@@ -535,27 +535,23 @@ public class Interp {
             // If - else statement
             case AslLexer.IF:
             {
-<<<<<<< HEAD
+
                 System.out.print("if (");
             	
                 Data value = generateExpression(t.getChild(0));
               
-=======
-                Data value = generateExpression(t.getChild(0));
->>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
                 checkBoolean(value);
                 
                 generateListInstructions(t.getChild(1));
-<<<<<<< HEAD
+
                 
                 System.out.println("}");
                 
                 if (t.getChildCount() == 3){//test of the presence of else statement
                 System.out.println("else {");
-=======
-                // Is there else statement ?
->>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
+
                 generateListInstructions(t.getChild(2));
+                }
                 return;
             }
             // While
@@ -571,24 +567,23 @@ public class Interp {
             // Return
 
             
-              case AslLexer.FOR:
-              {
+            case AslLexer.FOR:
+            {
                 //header
                 generateHeaderFor(t);
             	
-            	//instructions in the for
+                //instructions in the for
                 generateListInstructions(t.getChild(3));
             	            	
                 System.out.println("}");
-            	return;
-              }
+                return;
+            }
             
             
             // Parallel for statement 
             case AslLexer.PARALLEL_FOR:
             {
-                //test error if you are not yet in a parallel zone
-               
+                //test error if you are not yet in a parallel zone               
                 
                 if(!inParallelRegion) throw new ParallelException(); 
                       
@@ -603,6 +598,59 @@ public class Interp {
                 generateListInstructions(t.getChild(3));    
                 return;
             }
+            
+             // Parallel for statement 
+        /*    case AslLexer.PAR_ASSIGN:
+            {
+                //test error if you are not yet in a parallel zone
+               
+                if(!inParallelRegion) throw new ParallelException(); 
+                      
+                System.out.println(t.getChild(0));
+                
+                System.out.println(t.getChild(1));
+                
+                System.out.println(t.getChild(2));
+                               
+                return;
+            }*/
+            
+            
+             //The following call is used only for existance check
+            /*    AslTree id0Node = t.getChild(0);
+                AslTree id1Node = t.getChild(1);
+                AslTree expr = t.getChild(2);
+                Data toChange0;
+                Data toChange1;
+                
+                if (id0Node.getType() != AslLexer.OPENC || id1Node.getType() != AslLexer.OPENC) throw new ParallelException();
+                
+                else {
+                    toChange0 = Stack.getVariable(id0Node.getChild(0).getText());
+                    checkVector(toChange0);
+                    toChange1 = Stack.getVariable(id1Node.getChild(1).getText());
+                    checkVector(toChange1);
+                    
+                    if (toChange0.getType().equals(toChange1.getType())
+                        throw new RuntimeException ("Type of the both vectors mismatch");
+                    
+                    
+                    // parallel assign in a not sync ?? tiene sentido ?
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion){
+                        System.out.println("#pragma omp critical");
+                      }
+                    
+                   // System.out.print(id0Node.getChild(0).getText() + "[");
+                    Data vectorIndex = generateExpression(expr);
+                  //  System.out.print("] = ");
+
+                }
+                
+              
+                return;
+            
+             */
+
             
             // Return statement
             case AslLexer.RETURN:
@@ -778,14 +826,14 @@ public class Interp {
                 System.out.print(" " + t.getText() + " ");
           
                 value2 = generateExpression(t.getChild(1));
-<<<<<<< HEAD
+
                 
                 if (! value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in relational expression");
-=======
+
                 if (value.getType() != value2.getType()) {
                   throw new RuntimeException ("Incompatible types in relational expression");
->>>>>>> 8ae59fdca2abc301a6b5f26af97d415c2f170233
+
                 }
                 
                 break;

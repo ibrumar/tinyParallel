@@ -39,17 +39,6 @@ o = 92;
 
 
 
-int ajub;
-parallel_for (k = 0; k<99; k = k + 7){
-int t;
-int aaaaaa;
-int anonjunaue;
-}
-
-
-
-
-
 for (k = 0; k<99; a = a + 7){
 int ja;
 ja = ja +2;
