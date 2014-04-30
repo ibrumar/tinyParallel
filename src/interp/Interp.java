@@ -199,9 +199,7 @@ public class Interp {
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
 
-      private Data generateFunction (String funcnameArg) throws ParallelException {
-
-      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) {
+      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams) throws ParallelException {
 
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
@@ -548,9 +546,8 @@ public class Interp {
                 System.out.println("}");
                 
                 if (t.getChildCount() == 3){//test of the presence of else statement
-                System.out.println("else {");
-
-                generateListInstructions(t.getChild(2));
+                    System.out.println("else {");
+                    generateListInstructions(t.getChild(2));
                 }
                 return;
             }
@@ -600,24 +597,13 @@ public class Interp {
             }
             
              // Parallel for statement 
-        /*    case AslLexer.PAR_ASSIGN:
+          /*  case AslLexer.PAR_ASSIGN:
             {
                 //test error if you are not yet in a parallel zone
-               
                 if(!inParallelRegion) throw new ParallelException(); 
-                      
-                System.out.println(t.getChild(0));
                 
-                System.out.println(t.getChild(1));
-                
-                System.out.println(t.getChild(2));
-                               
-                return;
-            }*/
-            
-            
-             //The following call is used only for existance check
-            /*    AslTree id0Node = t.getChild(0);
+                //The following call is used only for existance check
+                AslTree id0Node = t.getChild(0);
                 AslTree id1Node = t.getChild(1);
                 AslTree expr = t.getChild(2);
                 Data toChange0;
@@ -635,21 +621,26 @@ public class Interp {
                         throw new RuntimeException ("Type of the both vectors mismatch");
                     
                     
-                    // parallel assign in a not sync ?? tiene sentido ?
+                  /*  // parallel assign in a not sync ?? tiene sentido ?
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion){
                         System.out.println("#pragma omp critical");
-                      }
+                    }
                     
-                   // System.out.print(id0Node.getChild(0).getText() + "[");
+                    // System.out.print(id0Node.getChild(0).getText() + "[");
                     Data vectorIndex = generateExpression(expr);
-                  //  System.out.print("] = ");
-
+                    // System.out.print("] = ");
+                    
+                    
+                    System.out.println("#pragma omp for");
+                    AslTree t = new AslTree();
+                    t.addChild(
                 }
-                
-              
                 return;
+            }*/
             
-             */
+            
+             
+            
 
             
             // Return statement
@@ -828,14 +819,8 @@ public class Interp {
                 value2 = generateExpression(t.getChild(1));
 
                 
-                if (! value.getType().equals(value2.getType())) {
-                    throw new RuntimeException ("Incompatible types in relational expression");
-
-                if (value.getType() != value2.getType()) {
-                  throw new RuntimeException ("Incompatible types in relational expression");
-
+                if (! value.getType().equals(value2.getType())) { throw new RuntimeException ("Incompatible types in relational expression");
                 }
-                
                 break;
 
             // Arithmetic operators
