@@ -388,7 +388,7 @@ public class Interp {
 
 
     // Function to generate the header of the for and the for parallel (there is the same, that's why this funcion exists)
-    private void generateHeaderFor(AslTree t) throws ParallelException{
+    private void generateHeaderFor(AslTree t, StringBuilder genCode) throws ParallelException{
         
         System.out.print("for (");
            	
@@ -400,7 +400,7 @@ public class Interp {
 		
         if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
 		
-        generateInstruction(t.getChild(0));
+        generateInstruction(t.getChild(0), genCode);
 		
         System.out.print(" ; ");
 		
@@ -413,7 +413,7 @@ public class Interp {
             forCompa.getType() != AslLexer.GE &&
             forCompa.getType() != AslLexer.GT ) throw new RuntimeException ("Must be comparation for a boucle for"); 
             
-        generateExpression(forCompa);
+        generateExpression(forCompa, genCode);
             	
         System.out.print(" ; ");
             	  	
@@ -422,7 +422,7 @@ public class Interp {
         if (forPlus.getType() != AslLexer.ASSIGN)
 		    throw new RuntimeException ("Must be assignation for a boucle for"); 
         
-        generateInstruction(forPlus);
+        generateInstruction(forPlus, genCode);
             	
         System.out.println(") {");
         
@@ -542,44 +542,33 @@ public class Interp {
 
                 System.out.print("if (");
             	
-                Data value = generateExpression(t.getChild(0));
+                Data value = generateExpression(t.getChild(0), genCode);
               
                 checkBoolean(value);
                 
-                generateListInstructions(t.getChild(1));
+                generateListInstructions(t.getChild(1), genCode);
                 
                 System.out.println("}");
                 
                 if (t.getChildCount() == 3){//test of the presence of else statement
-                System.out.println("else {");
+                    System.out.println("else {");
                 // Is there else statement ?
-                generateListInstructions(t.getChild(2));
+                    generateListInstructions(t.getChild(2), genCode);
+                }
                 return;
             }
-            // While
-           /* case AslLexer.WHILE:
-                while (true) {
-                    value = generateExpression(t.getChild(0), genCode);
-                    checkBoolean(value);
-                    if (!value.getBooleanValue()) return null;
-                    Data r = generateListInstructions(t.getChild(1), genCode);
-                    if (r != null) return r;
-                }*/
 
-            // Return
-
-            
             case AslLexer.FOR:
             {
                 //header
-                generateHeaderFor(t);
+                generateHeaderFor(t, genCode);
             	
             	//instructions in the for
-                generateListInstructions(t.getChild(3));
+                generateListInstructions(t.getChild(3), genCode);
             	            	
                 System.out.println("}");
             	return;
-              }
+            }
             
             
             // Parallel for statement 
@@ -596,9 +585,9 @@ public class Interp {
                 //gestion de private/shared by instructions/expressiones
                 
                 /*Header del for*/
-                generateHeaderFor(t);
+                generateHeaderFor(t, genCode);
                 /*Cuerpo del for*/
-                generateListInstructions(t.getChild(3));    
+                generateListInstructions(t.getChild(3), genCode);    
                 return;
             }
             
