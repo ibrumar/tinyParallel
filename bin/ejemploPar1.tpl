@@ -23,14 +23,15 @@ private_var : localsum;
     a[2] = a[2] + sharedSum;
   }
   a[2] = a[2] + sharedSum;
-  
+ 
+
   sharedSum = sharedSum + localsum;
   localsum = localsum + 1;
 
-  //begin_parallel
-  //{
+  begin_parallel
+  {
   
-  //} end_parallel
+  } end_parallel
 
 } end_parallel
 

@@ -28,7 +28,6 @@
 package interp;
 
 import parser.*;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Scanner;
@@ -36,6 +35,8 @@ import java.util.Iterator;
 import java.lang.StringBuilder;
 import java.util.Set;
 import java.io.*;
+
+
 
 /** Class that implements the interpreter of the language. */
 
@@ -105,33 +106,42 @@ public class Interp {
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
             String funcNameStr = funcNameIter.next();
-            Boolean hasReferenceParams = new Boolean(false);
+            BooleanContainer hasReferenceParams = new BooleanContainer();
+            hasReferenceParams.data = new Boolean(false);
             //genCode.append("The name of the function is" + funcNameStr + "\n");
             StringBuilder generatedFunctionCode = new StringBuilder();
             
-            boolean funcGenerated = true;
-            //try {
             if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams, generatedFunctionCode);
             else {
        //       genCode.append("Help" + funcNameStr + "\n");
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
                 inParallelRegion = false;
-                generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
-                if (hasReferenceParams.booleanValue()) {
-                    inParallelRegion = true;
-                    generateFunction(funcNameStr + "$$", hasReferenceParams, generatedFunctionCode);
-                    inParallelRegion = false;
+               
+                int funcNameSize = funcNameStr.length();
+                if (funcNameStr.charAt(funcNameSize - 1) == '$') {
+                    try {
+                        generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
+                        System.out.println("Those are the function keys " + FuncName2Tree.keySet());
+                    } catch (ParallelException pe) {
+                        FuncName2Tree.remove(funcNameStr);
+                    }
                 }
+                else {
+                    inParallelRegion = true;
+                    try {
+                        generateFunction(funcNameStr + "$", hasReferenceParams, generatedFunctionCode);
+                        System.out.println("Those are the function keys " + FuncName2Tree.keySet());
+                    } catch (ParallelException pe) {
+                        FuncName2Tree.remove(funcNameStr + "$");
+                    }
+                }
+                inParallelRegion = false;
             }
-            //} catch (ParallelException) {funcGenerated = false; }
-            //if (funcGenerated) genCode.append(generatedFunctionCode);
+            
             genCode.append(generatedFunctionCode);
-
         }
         System.out.println(genCode); 
     }
-    
-
     /** Returns the contents of the stack trace */
     public String getStackTrace() {
         return Stack.getStackTrace(lineNumber());
@@ -163,6 +173,7 @@ public class Interp {
                 }
                 else {
                     FuncName2Tree.put(fname, f);
+                    FuncName2Tree.put(fname + "$", f);//the parallel version points the same node
                 }
             }
             else 
@@ -207,10 +218,11 @@ public class Interp {
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
-      private Data generateFunction (String funcnameArg, Boolean hasReferenceParams, StringBuilder genCode) throws ParallelException {
+      private Data generateFunction (String funcnameArg, BooleanContainer hasReferenceParams, StringBuilder genCode) throws ParallelException {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
+        System.out.println("the Funcname is " + funcnameArg);
         if (f == null) throw new RuntimeException(" function " + funcnameArg + " not declared");
 
         AslTree returnType = f.getChild(0);
@@ -243,10 +255,14 @@ public class Interp {
            
             String param_type = paramNode.getText();
             genCode.append(param_type + " ");
-            
+           
+            Data passedData = new Data(paramNode.getText());
             if (AslLexer.PREF == paramNode.getChild(0).getType()) {
-                hasReferenceParams = new Boolean(true);
+                hasReferenceParams.data = new Boolean(true);
                 genCode.append("&");
+            }
+            else if (inParallelRegion) {
+                passedData.setShared(false);
             }
             
             String param_name = paramNode.getChild(0).getText();
@@ -333,7 +349,7 @@ public class Interp {
             checkParamsArgs(paramsNode, res, i);
         }
         Data value = new Data(functionTree.getChild(0).getText()); //this tells you the type returned
-        genCode.append(");" + "\n");
+        genCode.append(")");
         return value;
     }
 
@@ -632,6 +648,7 @@ public class Interp {
             // Function call
             case AslLexer.FUNCALL:
                 generateFuncall(t, genCode);
+                genCode.append(";\n");
                 return;
 
             default: assert false; // Should never happen
