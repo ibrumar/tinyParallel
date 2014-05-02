@@ -100,7 +100,7 @@ public class Interp {
         genCode.append("#include <iostream>" + "\n");
         genCode.append("#include <vector>" + "\n");
         genCode.append("#include <omp.h>" + "\n");
-        genCode.append("using namespace std;" + "\n");
+        genCode.append("using namespace std;" + "\n\n");
 
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
@@ -110,36 +110,71 @@ public class Interp {
             hasReferenceParams.data = new Boolean(false);
             //genCode.append("The name of the function is" + funcNameStr + "\n");
             StringBuilder generatedFunctionCode = new StringBuilder();
-            
-            if (funcNameStr.equals("main")) generateFunction("main", hasReferenceParams, generatedFunctionCode);
+
+            if (funcNameStr.equals("main")) {
+                
+            }
             else {
        //       genCode.append("Help" + funcNameStr + "\n");
                 AslTree funcNode = FuncName2Tree.get(funcNameStr);
-                inParallelRegion = false;
                
                 int funcNameSize = funcNameStr.length();
                 if (funcNameStr.charAt(funcNameSize - 1) == '$') {
+                    System.err.println ("Generating the parallelized version of " + funcNameStr.substring(0, funcNameSize - 1));
+                    inParallelRegion = true;
+                    inNotSyncRegion = false;
                     try {
+                        //the name already holds the '$' character
                         generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
-                        System.out.println("Those are the function keys " + FuncName2Tree.keySet());
+                        genCode.append(generatedFunctionCode);
                     } catch (ParallelException pe) {
+                        System.err.println ("Note: The parallel synced version of " + funcNameStr + " cannot be generated");
+                        funcNameIter.remove();
                         FuncName2Tree.remove(funcNameStr);
                     }
                 }
-                else {
+                else if (funcNameStr.charAt(funcNameSize - 1) == '_')
+                {
                     inParallelRegion = true;
+                    inNotSyncRegion = true;
+                    System.err.println ("Generating the not_synchronized parallelized version of " + funcNameStr.substring(0, funcNameSize - 1));
                     try {
-                        generateFunction(funcNameStr + "$", hasReferenceParams, generatedFunctionCode);
-                        System.out.println("Those are the function keys " + FuncName2Tree.keySet());
+                        //the name already holds the '_' character
+                        generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
+                        genCode.append(generatedFunctionCode);
                     } catch (ParallelException pe) {
-                        FuncName2Tree.remove(funcNameStr + "$");
+                        System.err.println ("Note: The parallel NOT synced version of " + funcNameStr + " cannot be generated");
+                        funcNameIter.remove();
+                        FuncName2Tree.remove(funcNameStr);
+                    }
+                    //System.out.println("Those are the function keys " + FuncName2Tree.keySet());
+
+                }
+                else {
+                    inParallelRegion = false;
+                    inNotSyncRegion = false;
+                    System.err.println ("Generating the serial version of " + funcNameStr.substring(0, funcNameSize));
+                    try {
+                        generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
+                        genCode.append(generatedFunctionCode);
+                    } catch (ParallelException pe) {
+                        funcNameIter.remove();
+                        FuncName2Tree.remove(funcNameStr);
+                        System.err.println ("Note: The serial version of " + funcNameStr + " cannot be generated");
                     }
                 }
                 inParallelRegion = false;
             }
-            
-            genCode.append(generatedFunctionCode);
+            System.err.print("\n");
         }
+
+        System.err.println ("Generating the main function\n");
+        inParallelRegion = false;
+        inNotSyncRegion = false;
+        StringBuilder generatedFunctionCode = new StringBuilder();
+        BooleanContainer hasReferenceParams = new BooleanContainer();
+        generateFunction("main", hasReferenceParams, generatedFunctionCode);
+        genCode.append(generatedFunctionCode);
         System.out.println(genCode); 
     }
     /** Returns the contents of the stack trace */
@@ -174,6 +209,7 @@ public class Interp {
                 else {
                     FuncName2Tree.put(fname, f);
                     FuncName2Tree.put(fname + "$", f);//the parallel version points the same node
+                    FuncName2Tree.put(fname + "_", f);//the parallel version points the same node
                 }
             }
             else 
@@ -222,7 +258,6 @@ public class Interp {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
         //For main we simulate just a list of normal instructions
-        System.out.println("the Funcname is " + funcnameArg);
         if (f == null) throw new RuntimeException(" function " + funcnameArg + " not declared");
 
         AslTree returnType = f.getChild(0);
@@ -276,7 +311,7 @@ public class Interp {
         genCode.append(") {" + "\n");
         // Execute the instructions
         Data result = generateListInstructions(f.getChild(2), genCode);
-        genCode.append("}" + "\n");
+        genCode.append("}" + "\n\n");
 
         // If the result is null, then the function returns void
         if (result == null) result = new Data("void");
@@ -357,8 +392,7 @@ public class Interp {
     void generateParallelZone(AslTree t, StringBuilder genCode) throws ParallelException {
         /** Says if the compilation is done in a parallel region */
         if (inParallelRegion)
-            throw new ParallelException ();
-            
+            throw new ParallelException ("Opening parallel region inside another one");
             
         // in the other case, we create the zone
         inParallelRegion = true;
@@ -381,11 +415,15 @@ public class Interp {
                 parallelZoneHeader += privateVarNode.getChild(i).getText();
             }
             parallelZoneHeader += ")";
-            genCode.append(parallelZoneHeader + "\n");
         } 
         
-        genCode.append("{" + "\n");
-        generateListInstructions(t.getChild(1), genCode);
+        genCode.append(parallelZoneHeader + "\n{" + "\n");
+
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR)
+            generateListInstructions(t.getChild(1), genCode);
+        else 
+            generateListInstructions(t.getChild(0), genCode);
+        
         genCode.append("\n}" + "\n");
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
@@ -470,13 +508,12 @@ public class Interp {
             case AslLexer.NOT_SYNC:
             {
                 if (!inParallelRegion) {
-                    System.err.print ("Warning: Using a not_sync outside a parallel region is useless ");
-                    System.err.println ("because there is no synchronization needed in serial code:"+ lineNumber());
-                    System.err.println ("Warning: The whole not sync with its code has been skipped");
+                    System.err.print ("Note: Using a not_sync outside a parallel region is useless:"+ lineNumber() + "\n");
+                    generateListInstructions(t.getChild(0), genCode);
                 }
                 else if (inNotSyncRegion) { 
-                    System.err.println ("Warning: Using a not_sync inside a not_sync is useless:"+ lineNumber());
-                    System.err.println ("Warning: The whole not sync with its code has been skipped");
+                    System.err.println ("Note: Using a not_sync inside a not_sync is useless:"+ lineNumber() + "\n");
+                    generateListInstructions(t.getChild(0), genCode);
                 
                 }
                 else {

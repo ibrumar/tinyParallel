@@ -28,10 +28,10 @@ private_var : localsum;
   sharedSum = sharedSum + localsum;
   localsum = localsum + 1;
 
-  begin_parallel
-  {
+//  begin_parallel
+//  {
   
-  } end_parallel
+//  } end_parallel
 
 } end_parallel
 
