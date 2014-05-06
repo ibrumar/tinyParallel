@@ -70,7 +70,7 @@ paramlist: param (','! param)*
         ;//preguntar si se debe implementar paso por valor o por referencia
  
 param	:	type '&' id=ID -> ^(type PREF[$id,$id.text])
-		|	type id=ID -> ^(type PVALUE[$id,$id.text])
+		|	type id=ID (OPENC CLOSEC)? -> ^(type PVALUE[$id,$id.text] OPENC?)
 		;
 
 block_instructions	: '{' instruction* '}' -> ^(INSTR_BLOCK instruction*)

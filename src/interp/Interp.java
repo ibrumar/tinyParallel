@@ -287,15 +287,24 @@ public class Interp {
         // Copy the parameters to the current activation record
         for (int i = 0; i < nparam; ++i) {
             AslTree paramNode = p.getChild(i);
-           
+            
             String param_type = paramNode.getText();
-            genCode.append(param_type + " ");
+            
+            boolean paramIsVector = (paramNode.getChildCount() != 1);
+
+            if (!paramIsVector)
+                genCode.append(param_type + " ");
+            else
+                genCode.append("vector<" + param_type + "> ");
            
             Data passedData = new Data(paramNode.getText());
-            if (AslLexer.PREF == paramNode.getChild(0).getType()) {
+            //if the passed data is a vector it will always be by reference
+            if (AslLexer.PREF == paramNode.getChild(0).getType() || paramIsVector) {
                 hasReferenceParams.data = new Boolean(true);
                 genCode.append("&");
+                //System.err.println("PREF");
             }
+
             else if (inParallelRegion) {
                 passedData.setShared(false);
             }
@@ -305,7 +314,12 @@ public class Interp {
             if (i < nparam-1) {
                 genCode.append(", ");
             }
-            Stack.defineVariable(param_name, new Data(paramNode.getText()));
+
+            Data toDefine = new Data(paramNode.getText());
+            if (paramIsVector) 
+                toDefine.setVector();
+
+            Stack.defineVariable(param_name, toDefine);
         }
 
         genCode.append(") {" + "\n");
@@ -345,6 +359,11 @@ public class Interp {
     }
   
     private void checkParamsArgs(AslTree paramsNode, Data typeArg, int numArg) {
+        //System.err.println("The parameter "+ paramsNode.getChild(numArg).getChild(0).getText() + " has " + paramsNode.getChild(numArg).getChildCount() + " childs and the argument is a vector " + typeArg.isVector());
+        if (paramsNode.getChild(numArg).getChildCount() != 1 && !typeArg.isVector())
+            throw new RuntimeException ("The argument " + numArg + " should be a vector");       
+        if (paramsNode.getChild(numArg).getChildCount() == 1 && typeArg.isVector())
+            throw new RuntimeException ("The argument " + numArg + " shouldn't be a vector");       
         if (!typeArg.getType().equals(paramsNode.getChild(numArg).getText()))
             throw new RuntimeException ("The type of the argument " + numArg + " doesn't match to its corresponding parameter");       
     }
@@ -380,7 +399,7 @@ public class Interp {
                 throw new RuntimeException ("Argument " + i + "must be an identifier. The corresponding parameter is reference passed");
             
             setLineNumber(a);
-            Data res = generateExpression(a, genCode);
+            Data res = generateExpression(a, genCode); //this simply looks at the id and returns the dataType
             checkParamsArgs(paramsNode, res, i);
         }
         Data value = new Data(functionTree.getChild(0).getText()); //this tells you the type returned
@@ -534,6 +553,9 @@ public class Interp {
                 
                 if (identNode.getType() != AslLexer.OPENC) {
                     toChange = Stack.getVariable(identNode.getText());
+                    if (toChange.isVector())
+                        throw new RuntimeException ("Error: A vector can be accessed only using vector_id[element] :" + t.getLine());
+
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
                         genCode.append("#pragma omp critical" + "\n");
                     genCode.append(identNode.getText() + " = ");
@@ -737,6 +759,7 @@ public class Interp {
             case AslLexer.INTLIT:
                 value = new Data("int");
                 genCode.append(t.getText());
+
                 
                 break;
             // A Boolean literal
