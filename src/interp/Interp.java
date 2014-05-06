@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.lang.StringBuilder;
 import java.util.Set;
 import java.io.*;
+import org.antlr.runtime.Token;
 
 
 
@@ -44,6 +45,8 @@ public class Interp {
 
     /** Memory of the virtual machine. */
     private Stack Stack;
+    
+    private static int counterSpace = 0;
 
     /**
      * Map between function names (keys) and ASTs (values).
@@ -105,6 +108,7 @@ public class Interp {
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
+            counterSpace = 0;
             String funcNameStr = funcNameIter.next();
             BooleanContainer hasReferenceParams = new BooleanContainer();
             hasReferenceParams.data = new Boolean(false);
@@ -173,6 +177,7 @@ public class Interp {
         inNotSyncRegion = false;
         StringBuilder generatedFunctionCode = new StringBuilder();
         BooleanContainer hasReferenceParams = new BooleanContainer();
+        counterSpace = 0;
         generateFunction("main", hasReferenceParams, generatedFunctionCode);
         genCode.append(generatedFunctionCode);
         System.out.println(genCode); 
@@ -249,11 +254,20 @@ public class Interp {
     private void setLineNumber(int l) { linenumber = l;}
 
 
+    private String xTimesChar(int n){
+        String res = "";
+        for (int i =0; i<n; i++){
+            res = res + "  ";
+        }
+        return res;
+    }
+
     /**
      * Executes a function.
      * @param funcname The name of the function.
      * @param args The AST node representing the list of arguments of the caller.
      * @return The data returned by the function.*/
+
       private Data generateFunction (String funcnameArg, BooleanContainer hasReferenceParams, StringBuilder genCode) throws ParallelException {
         // Get the AST of the function
         AslTree f = FuncName2Tree.get(funcnameArg);
@@ -323,8 +337,11 @@ public class Interp {
         }
 
         genCode.append(") {" + "\n");
+        counterSpace += 2;
         // Execute the instructions
         Data result = generateListInstructions(f.getChild(2), genCode);
+
+        counterSpace -= 2;
         genCode.append("}" + "\n\n");
 
         // If the result is null, then the function returns void
@@ -350,6 +367,10 @@ public class Interp {
         Data result = null;
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
+            String indentation = xTimesChar(counterSpace);
+            if (t.getChild(i).getType() != AslLexer.NOT_SYNC){
+                genCode.append(indentation);
+            }
             generateInstruction (t.getChild(i), genCode);
             if (t.getChild(i).getType() == AslLexer.ASSIGN){
             	genCode.append(";" + "\n");
@@ -436,14 +457,20 @@ public class Interp {
             parallelZoneHeader += ")";
         } 
         
-        genCode.append(parallelZoneHeader + "\n{" + "\n");
 
+        genCode.append(parallelZoneHeader + "\n");
+        
+        genCode.append(xTimesChar(counterSpace) + "{" + "\n");
+        counterSpace += 2;
+       
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR)
             generateListInstructions(t.getChild(1), genCode);
         else 
             generateListInstructions(t.getChild(0), genCode);
         
-        genCode.append("\n}" + "\n");
+        counterSpace -= 2;
+        genCode.append(xTimesChar(counterSpace) +"}" + "\n");
+
         
         if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
@@ -463,7 +490,7 @@ public class Interp {
     // Function to generate the header of the for and the for parallel (there is the same, that's why this funcion exists)
     private void generateHeaderFor(AslTree t, StringBuilder genCode) throws ParallelException{
         
-        System.out.print("for (");
+        genCode.append("for (");
            	
         /* header - parte assignation del variant*/
 		
@@ -475,7 +502,7 @@ public class Interp {
 		
         generateInstruction(t.getChild(0), genCode);
 		
-        System.out.print(" ; ");
+        genCode.append(" ; ");
 		
 		
         /*header - parte increment*/
@@ -488,7 +515,7 @@ public class Interp {
             
         generateExpression(forCompa, genCode);
             	
-        System.out.print(" ; ");
+        genCode.append(" ; ");
             	  	
         AslTree forPlus = t.getChild(2);
 		
@@ -496,11 +523,15 @@ public class Interp {
 		    throw new RuntimeException ("Must be assignation for a boucle for"); 
         
         generateInstruction(forPlus, genCode);
-            	
-        System.out.println(") {");
         
+           	
+        genCode.append(") { \n");
+        counterSpace += 2;
     }
 
+
+
+                    
     /**
      * Executes an instruction. 
      * Non-null results are only returned by "return" statements.
@@ -557,7 +588,7 @@ public class Interp {
                         throw new RuntimeException ("Error: A vector can be accessed only using vector_id[element] :" + t.getLine());
 
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
-                        genCode.append("#pragma omp critical" + "\n");
+                        genCode.append("#pragma omp critical" + "\n" + xTimesChar(counterSpace));
                     genCode.append(identNode.getText() + " = ");
                 }
                 
@@ -566,7 +597,7 @@ public class Interp {
                     checkVector(toChange);
                     
                     if (toChange.isShared() && !inNotSyncRegion && inParallelRegion)
-                        genCode.append("#pragma omp critical" + "\n");
+                        genCode.append("#pragma omp critical" + "\n" + xTimesChar(counterSpace));
                     
                     genCode.append(identNode.getChild(0).getText() + "[");
                     Data vectorIndex = generateExpression(identNode.getChild(1), genCode);
@@ -615,56 +646,200 @@ public class Interp {
             case AslLexer.IF:
             {
 
-                System.out.print("if (");
+                genCode.append("if (");
             	
                 Data value = generateExpression(t.getChild(0), genCode);
               
                 checkBoolean(value);
                 
-                generateListInstructions(t.getChild(1), genCode);
                 
-                System.out.println("}");
+                genCode.append (") { \n");
+                counterSpace += 2;
+                
+                generateListInstructions(t.getChild(1), genCode);
+
+                counterSpace -= 2;
+                genCode.append(xTimesChar(counterSpace) + "} \n");
                 
                 if (t.getChildCount() == 3){//test of the presence of else statement
-                    System.out.println("else {");
-                // Is there else statement ?
+                    
+                    genCode.append(xTimesChar(counterSpace) +"else { \n");
+                    counterSpace += 2;
+                    
                     generateListInstructions(t.getChild(2), genCode);
+                    counterSpace -= 2;
+                    genCode.append( xTimesChar(counterSpace) +"} \n");
                 }
+               
                 return;
             }
 
+
+    
             case AslLexer.FOR:
             {
                 //header
                 generateHeaderFor(t, genCode);
             	
+
             	//instructions in the for
                 generateListInstructions(t.getChild(3), genCode);
-            	            	
-                System.out.println("}");
+                
+            	counterSpace -= 2;           	
+                genCode.append(xTimesChar(counterSpace) +"} \n");
             	return;
+
             }
             
             
             // Parallel for statement 
             case AslLexer.PARALLEL_FOR:
             {
-                //test error if you are not yet in a parallel zone
-               
+                //test error if you are not yet in a parallel zone               
                 
                 if(!inParallelRegion) throw new ParallelException(); 
                       
                 //print del pragma
-                System.out.println("#pragma omp for");
+                //genCode.append("#pragma omp for\n"+ xTimesChar(counterSpace)+ "{\n");
+                genCode.append("#pragma omp for\n");
+                counterSpace += 2;
                 
                 //gestion de private/shared by instructions/expressiones
                 
                 /*Header del for*/
+                genCode.append(xTimesChar(counterSpace));
                 generateHeaderFor(t, genCode);
                 /*Cuerpo del for*/
-                generateListInstructions(t.getChild(3), genCode);    
+                generateListInstructions(t.getChild(3), genCode);
+                counterSpace -= 2;
+                genCode.append(xTimesChar(counterSpace) +"} \n");
+                counterSpace -= 2;
                 return;
             }
+            
+            // Parallel for statement 
+            case AslLexer.PAR_ASSIGN:
+            {
+
+                //test error if you are not yet in a parallel zone
+                if(!inParallelRegion) throw new ParallelException(); 
+                
+                //The following call is used only for existance check
+                AslTree id0Node = t.getChild(0);
+               
+                AslTree id1Node = t.getChild(1);
+                
+                AslTree expr = t.getChild(2);
+               
+                Data toChange0;
+                Data toChange1;
+                toChange0 = Stack.getVariable(id0Node.getText());
+                checkVector(toChange0);
+                toChange1 = Stack.getVariable(id1Node.getText());
+                checkVector(toChange1);
+                
+               
+                if (toChange0.getType() == (toChange1.getType()))
+                    throw new RuntimeException ("Type of the both vectors mismatch");
+                    
+                    /* parallel assign in a not sync ?? tiene sentido ?
+                    if (toChange.isShared() && !inNotSyncRegion && inParallelRegion){
+                        System.out.println("#pragma omp critical");
+                    }*/
+                    
+                    // System.out.print(id0Node.getChild(0).getText() + "[");
+                   // Data vectorIndex = generateExpression(expr,genCode);
+                    // System.out.print("] = ");
+                
+                 genCode.append("#pragma omp for\n");
+                 counterSpace += 2;
+                 //genCode.append(xTimesChar(counterSpace) + "int _i; \n");
+                 genCode.append(xTimesChar(counterSpace) + "for (int _i = 0 ; _i < ");
+                
+                 generateExpression(expr,genCode);
+                 
+                 genCode.append(" ; _i = _i + 1) { \n");
+                 counterSpace += 2;
+                 genCode.append(xTimesChar(counterSpace) + id0Node.getText() + "[_i] = " + id1Node.getText() + "[_i]; \n" );
+                 counterSpace -= 2;
+                 genCode.append(xTimesChar(counterSpace) +"} \n");
+                 counterSpace -= 2;
+                 
+                 return;
+            }
+                   /*
+                    // Definition of index i of the for
+                    Data index = new Data ("int");
+                    String nom_var = "_i";
+                    Stack.defineVariable(nom_var, index);
+                   
+                    Token kfor;
+                    kfor.setText("FOR");
+                    AslTree tfor = new AslTree(kfor);
+                    
+                    
+                    Token kindex;
+                    kindex.setText("=");
+                    AslTree tindex = new AslTree(kindex);
+                 // tindex.setStringValue("=");
+                 // tindex.addChild(0, Stack.getVariable(nom_var));
+                 // tindex.addChild(1, "0");
+                 // tfor.addChild(0, tindex);
+               
+                    Token ki;
+                    ki.setText("_i");
+                    AslTree aki = new AslTree(ki);
+                    tindex.addChild(aki);
+                    
+                    Token k0;
+                    ki.setText("0");
+                    AslTree ak0 = new AslTree(k0);
+                    tindex.addChild(ak0);
+                    tfor.addChild(tindex);
+                    
+                    Token kcompa;
+                    kcompa.setText("<");
+                    AslTree tcompa = new AslTree(kcompa);
+                   // tcompa.setStringValue("<");
+                   // tcompa.addChild(0, Stack.getVariable(nom_var));
+                   // tcompa.addChild(1,vectorIndex);
+                   // tfor.addChild(1, tindex);
+                    tcompa.addChild(aki);
+                    tcompa.addChild(ak0);
+                    tfor.addChild(tindex);
+                    
+                    Token ksupp;
+                    ksupp.setText("=");
+                    AslTree tsupp = new AslTree(ksupp);
+                 // tsupp.setStringValue("=");
+                 // tindex.addChild(0, Stack.getVariable(nom_var));
+                    tindex.addChild(aki);
+                    Token kadd;
+                    ksupp.setText("+");
+                    AslTree tadd = new AslTree(kadd);
+                 // tadd.setStringValue("+");
+                 // tadd.addChild(0,"_i");
+                 // tadd.addChild(1,"1");
+                 // tindex.addChild(1, tsupp);
+                 // tfor.addChild(2, tindex);
+                    tadd.addChild(aki);
+                    Token k1;
+                    ki.setText("1");
+                    AslTree ak1 = new AslTree(k1);
+                    tadd.addChild(ak1);
+                    tindex.addChild(tsupp);
+                    tfor.addChild(tindex);
+                    
+                    // Header del for
+                    generateHeaderFor(tfor, genCode);
+                    
+                    // assignation
+                    System.out.print(id0Node.getText());
+                    System.out.print("[_i] = ");
+                    System.out.print(id0Node.getText());
+                    System.out.print("[_i] ;");
+                   */                    
+                
             
             // Return statement
             case AslLexer.RETURN:
@@ -837,14 +1012,15 @@ public class Interp {
             case AslLexer.GT:
             case AslLexer.GE:
                 //given that c permits boolean comparison we do too
+
                 value = generateExpression(t.getChild(0), genCode);
                 genCode.append(" " + t.getText() + " ");
                 value2 = generateExpression(t.getChild(1), genCode);
                 
                 if (! value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in relational expression");
+
                 }
-                
                 break;
 
             // Arithmetic operators
