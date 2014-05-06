@@ -2,8 +2,12 @@ package interp;
 
 public class ParallelException extends Exception {
 
-public ParallelException(){
-    System.out.println("Illegal use of parallelism out of a parallel zone");
-  } 
+    public ParallelException() {
+        System.err.println("Parallel Exception: Illegal use of parallelism");
+    }
+
+    public ParallelException(String message) {
+        System.err.println("Parallel Exception: " + message);
+    } 
 
 }

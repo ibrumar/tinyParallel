@@ -118,10 +118,10 @@ public class Asl{
             // Creates and prepares the interpreter
             Interp I = null;
             int linenumber = -1;
-            try {
+            //try {
                 I = new Interp(t, tracefile); // prepares the interpreter
                 I.Run();                  // Executes the code
-            } catch (RuntimeException e) {
+           /* } catch (RuntimeException e) {
                 if (I != null) linenumber = I.lineNumber();
                 System.err.print ("\nRuntime error");
                 if (linenumber < 0) System.err.print (": ");
@@ -134,7 +134,7 @@ public class Asl{
                 if (linenumber < 0) System.err.print (".");
                 else System.err.println (" (" + infile + ", line " + linenumber + ").");
                 //System.err.format (I.getStackTrace(5));
-            }
+            }*/
         }
     }
 
