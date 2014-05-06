@@ -10,6 +10,8 @@ int test;
 int a;
 a = 8;
 int b [8];
+int c [9];
+int ovec[9];
 
 int jaajaja;
 int i;
@@ -33,25 +35,24 @@ test = 788758;
 int k;
 int o;
 o = 92;
-
+k = 7 + 8 + 12;
 
 
 begin_parallel
-
 private_var : k;
 {
-
-
 int ajub;
 parallel_for (k = 0; k<99; k = k + 7){
 int t;
 int aaaaaa;
 int anonjunaue;
 }
-} end_parallel
 
-
-
+o = o + 10;
+ovec  := c $ 2 $;
+c := b $ 4-9+6 $;
+} 
+end_parallel
 
 for (k = 0; k<99; a = a + 7){
 int ja;
@@ -69,8 +70,3 @@ yuju = 77;
 yuju = yuju /2;
 write (papa);
 read yuju;
-
-
-
-
-

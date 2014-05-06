@@ -54,6 +54,10 @@ public class AslTree extends CommonTree {
     public AslTree getChild(int i) {
         return (AslTree) super.getChild(i);
     }
+    
+    public void addChild (AslTree t){
+    super.addChild(t);
+    }
 
     /** Get the integer value of the node. */
     public int getIntValue() { return intValue;}
