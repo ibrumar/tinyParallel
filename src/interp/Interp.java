@@ -108,6 +108,7 @@ public class Interp {
         Set<String> functionNames = FuncName2Tree.keySet();
         Iterator<String> funcNameIter = functionNames.iterator();
         while (funcNameIter.hasNext()) {
+            counterSpace = 0;
             String funcNameStr = funcNameIter.next();
             BooleanContainer hasReferenceParams = new BooleanContainer();
             hasReferenceParams.data = new Boolean(false);
@@ -176,6 +177,7 @@ public class Interp {
         inNotSyncRegion = false;
         StringBuilder generatedFunctionCode = new StringBuilder();
         BooleanContainer hasReferenceParams = new BooleanContainer();
+        counterSpace = 0;
         generateFunction("main", hasReferenceParams, generatedFunctionCode);
         genCode.append(generatedFunctionCode);
         System.out.println(genCode); 
@@ -255,7 +257,7 @@ public class Interp {
     private String xTimesChar(int n){
         String res = "";
         for (int i =0; i<n; i++){
-            res = res + "  " + counterSpace;
+            res = res + "  ";
         }
         return res;
     }
@@ -352,7 +354,9 @@ public class Interp {
         int ninstr = t.getChildCount();
         for (int i = 0; i < ninstr; ++i) {
             String indentation = xTimesChar(counterSpace);
-            genCode.append(indentation);
+            if (t.getChild(i).getType() != AslLexer.NOT_SYNC){
+                genCode.append(indentation);
+            }
             generateInstruction (t.getChild(i), genCode);
             if (t.getChild(i).getType() == AslLexer.ASSIGN){
             	genCode.append(";" + "\n");
@@ -674,7 +678,8 @@ public class Interp {
                 if(!inParallelRegion) throw new ParallelException(); 
                       
                 //print del pragma
-                genCode.append("#pragma omp for\n"+ xTimesChar(counterSpace)+ "{\n");
+                //genCode.append("#pragma omp for\n"+ xTimesChar(counterSpace)+ "{\n");
+                genCode.append("#pragma omp for\n");
                 counterSpace += 2;
                 
                 //gestion de private/shared by instructions/expressiones
@@ -687,7 +692,6 @@ public class Interp {
                 counterSpace -= 2;
                 genCode.append(xTimesChar(counterSpace) +"} \n");
                 counterSpace -= 2;
-                genCode.append(xTimesChar(counterSpace) +"} \n"); 
                 return;
             }
             
@@ -725,10 +729,10 @@ public class Interp {
                    // Data vectorIndex = generateExpression(expr,genCode);
                     // System.out.print("] = ");
                 
-                 genCode.append("#pragma omp for\n"+ xTimesChar(counterSpace)+ "{\n");
+                 genCode.append("#pragma omp for\n");
                  counterSpace += 2;
-                 genCode.append(xTimesChar(counterSpace) + "int _i; \n");
-                 genCode.append(xTimesChar(counterSpace) + "for (_i = 0 ; _i < ");
+                 //genCode.append(xTimesChar(counterSpace) + "int _i; \n");
+                 genCode.append(xTimesChar(counterSpace) + "for (int _i = 0 ; _i < ");
                 
                  generateExpression(expr,genCode);
                  
@@ -738,7 +742,7 @@ public class Interp {
                  counterSpace -= 2;
                  genCode.append(xTimesChar(counterSpace) +"} \n");
                  counterSpace -= 2;
-                 genCode.append(xTimesChar(counterSpace) +"} \n");
+                 
                  return;
             }
                    /*
