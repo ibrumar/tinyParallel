@@ -1,13 +1,13 @@
 package interp;
 
 public class ParallelException extends Exception {
-
+    public String errorName;
     public ParallelException() {
-        System.err.println("Parallel Exception: Illegal use of parallelism");
+        errorName = "Parallel Exception: Illegal use of parallelism";
     }
 
     public ParallelException(String message) {
-        System.err.println("Parallel Exception: " + message);
+        errorName = "Parallel Exception: " + message;
     } 
 
 }
