@@ -134,7 +134,7 @@ public class Asl{
                 if (linenumber < 0) System.err.print (".");
                 else System.err.println (" (" + infile + ", line " + linenumber + ").");
                 //System.err.format (I.getStackTrace(5));
-            }
+            }*/
         }
     }
 
