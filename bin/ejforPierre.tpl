@@ -69,5 +69,8 @@ coucou (papa,false,papa, 77, true);
 int yuju;
 yuju = 77;
 yuju = yuju /2;
+bool arr [3];
+bool arrNew [3];
+arr := arrNew $ 2 $;
 write (papa);
 read yuju;
