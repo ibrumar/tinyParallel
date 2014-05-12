@@ -8,6 +8,7 @@ int coucou (int blabla, bool doudou, int & eee, int aaa, bool oustiti){
 
 int test;
 int a;
+int eeee;
 a = 8;
 int b [8];
 int c [9];
