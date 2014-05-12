@@ -406,8 +406,21 @@ public class Interp {
     */
     private Data generateFuncall(AslTree t, StringBuilder genCode) {
         String funcName = t.getChild(0).getText();
+        String errorMessage;
+        if (inParallelRegion && inNotSyncRegion) {
+            errorMessage = "Call to unexisting not syncronized version of function "+ funcName;
+            funcName = funcName + "_";
+        }
+        else if (inParallelRegion) {
+            errorMessage = "Call to unexisting parallel (and syncronized) version of function "+ funcName;
+            funcName = funcName + "$";
+        }
+        else {
+            errorMessage = "Call to unexisting function "+ funcName;
+        }
+        
         if (!FuncName2Tree.containsKey(funcName))
-            throw new RuntimeException ("Call to unexisting function "+ funcName );
+            throw new RuntimeException (errorMessage);
         
         AslTree args = t.getChild(1);
         int numArgs = args.getChildCount();

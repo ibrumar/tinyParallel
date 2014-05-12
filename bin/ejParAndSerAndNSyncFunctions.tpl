@@ -15,5 +15,9 @@ int test (int & hola){
 }
 
 int hola;
-test(hola);
+//begin_parallel{
+//    not_sync {
+        test(hola);
+//    }
+//}end_parallel
 
