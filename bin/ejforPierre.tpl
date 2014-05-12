@@ -8,6 +8,7 @@ int coucou (int blabla, bool doudou, int & eee, int aaa, bool oustiti){
 
 int test;
 int a;
+int eeee;
 a = 8;
 int b [8];
 int c [9];
@@ -68,5 +69,8 @@ coucou (papa,false,papa, 77, true);
 int yuju;
 yuju = 77;
 yuju = yuju /2;
+bool arr [3];
+bool arrNew [3];
+arr := arrNew $ 2 $;
 write (papa);
 read yuju;

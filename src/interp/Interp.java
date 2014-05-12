@@ -47,6 +47,8 @@ public class Interp {
     private Stack Stack;
     
     private static int counterSpace = 0;
+    
+    private static ArrayList<String> listFunc = new ArrayList<String>();
 
     /**
      * Map between function names (keys) and ASTs (values).
@@ -105,11 +107,14 @@ public class Interp {
         genCode.append("#include <omp.h>" + "\n");
         genCode.append("using namespace std;" + "\n\n");
 
-        Set<String> functionNames = FuncName2Tree.keySet();
-        Iterator<String> funcNameIter = functionNames.iterator();
-        while (funcNameIter.hasNext()) {
+      //  Set<String> functionNames = FuncName2Tree.keySet();
+      //  Iterator<String> funcNameIter = functionNames.iterator();
+        Iterator<String> funcIter = listFunc.iterator();
+      //  while (funcNameIter.hasNext()) {
+        while (funcIter.hasNext()) {
             counterSpace = 0;
-            String funcNameStr = funcNameIter.next();
+       //     String funcNameStr = funcNameIter.next();
+         String funcNameStr = funcIter.next();
             BooleanContainer hasReferenceParams = new BooleanContainer();
             hasReferenceParams.data = new Boolean(false);
             //genCode.append("The name of the function is" + funcNameStr + "\n");
@@ -133,7 +138,8 @@ public class Interp {
                         genCode.append(generatedFunctionCode);
                     } catch (ParallelException pe) {
                         System.err.println ("Note: The parallel synced version of " + funcNameStr + " cannot be generated");
-                        funcNameIter.remove();
+                 //       funcNameIter.remove();
+                        funcIter.remove();
                         FuncName2Tree.remove(funcNameStr);
                     }
                 }
@@ -148,7 +154,8 @@ public class Interp {
                         genCode.append(generatedFunctionCode);
                     } catch (ParallelException pe) {
                         System.err.println ("Note: The parallel NOT synced version of " + funcNameStr + " cannot be generated");
-                        funcNameIter.remove();
+                    //    funcNameIter.remove();
+                        funcIter.remove();
                         FuncName2Tree.remove(funcNameStr);
                     }
                     //System.out.println("Those are the function keys " + FuncName2Tree.keySet());
@@ -162,7 +169,8 @@ public class Interp {
                         generateFunction(funcNameStr, hasReferenceParams, generatedFunctionCode);
                         genCode.append(generatedFunctionCode);
                     } catch (ParallelException pe) {
-                        funcNameIter.remove();
+                     //   funcNameIter.remove();
+                        funcIter.remove();
                         FuncName2Tree.remove(funcNameStr);
                         System.err.println ("Note: The serial version of " + funcNameStr + " cannot be generated");
                     }
@@ -212,8 +220,11 @@ public class Interp {
                     throw new RuntimeException("Multiple definitions of function " + fname);
                 }
                 else {
+                    listFunc.add(fname);
                     FuncName2Tree.put(fname, f);
+                    listFunc.add(fname + "$");
                     FuncName2Tree.put(fname + "$", f);//the parallel version points the same node
+                    listFunc.add(fname + "_");
                     FuncName2Tree.put(fname + "_", f);//the parallel version points the same node
                 }
             }
@@ -497,6 +508,10 @@ public class Interp {
         String varBoucle = t.getChild(0).getChild(0).getText();
 		
         Data variant = Stack.getVariable(varBoucle);
+        
+        //case pragma omp critical - we don't want to permit to use a variable with critical in the header of the header of a parallel_for
+		if (variant.isShared() && !inNotSyncRegion && inParallelRegion) 
+		    throw new RuntimeException ("Variant of the header of a parallel_for must be private variable in");
 		
         if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
 		
@@ -720,11 +735,15 @@ public class Interp {
             // Parallel for statement 
             case AslLexer.PAR_ASSIGN:
             {
-
-                //test error if you are not yet in a parallel zone
-                if(!inParallelRegion) throw new ParallelException(); 
+                //test if you are not yet in a parallel zone, open one !
+                if(!inParallelRegion){
+                 genCode.append("#pragma omp parallel default(shared)\n" + xTimesChar(counterSpace)+ "{\n");
+                 counterSpace += 2;
+                 genCode.append(xTimesChar(counterSpace));
+                } 
+                // if(!inParallelRegion) throw new ParallelException(); 
                 
-                //The following call is used only for existance check
+                //The following call is used only for existance check - verification that for the variables used in the assign are Vectors
                 AslTree id0Node = t.getChild(0);
                
                 AslTree id1Node = t.getChild(1);
@@ -738,7 +757,7 @@ public class Interp {
                 toChange1 = Stack.getVariable(id1Node.getText());
                 checkVector(toChange1);
                 
-               
+               // Check if the vectors are of the same type
                 if (toChange0.getType() == (toChange1.getType()))
                     throw new RuntimeException ("Type of the both vectors mismatch");
                     
@@ -764,6 +783,12 @@ public class Interp {
                  counterSpace -= 2;
                  genCode.append(xTimesChar(counterSpace) +"} \n");
                  counterSpace -= 2;
+                 
+                 // to close the parallel region opened before
+                 if(!inParallelRegion){
+                    counterSpace -= 2;
+                    genCode.append("\n"+ xTimesChar(counterSpace)+"}\n");
+                 }
                  
                  return;
             }
