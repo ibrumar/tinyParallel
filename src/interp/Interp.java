@@ -800,7 +800,7 @@ public class Interp {
                  // to close the parallel region opened before
                  if(!inParallelRegion){
                     counterSpace -= 2;
-                    genCode.append("\n"+ xTimesChar(counterSpace)+"}\n");
+                    genCode.append(xTimesChar(counterSpace)+"}\n");
                  }
                  
                  return;
