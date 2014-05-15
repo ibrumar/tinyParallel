@@ -36,7 +36,7 @@ import java.lang.StringBuilder;
 import java.util.Set;
 import java.io.*;
 import org.antlr.runtime.Token;
-
+import org.antlr.runtime.CommonToken;
 
 
 /** Class that implements the interpreter of the language. */
@@ -50,6 +50,8 @@ public class Interp {
     
     private static ArrayList<String> listFunc = new ArrayList<String>();
 
+    private static HashMap<String, String> hashBuiltinFunc = new HashMap<String, String>();
+    
     /**
      * Map between function names (keys) and ASTs (values).
      * Each entry of the map stores the root of the AST
@@ -114,7 +116,7 @@ public class Interp {
         while (funcIter.hasNext()) {
             counterSpace = 0;
        //     String funcNameStr = funcNameIter.next();
-         String funcNameStr = funcIter.next();
+            String funcNameStr = funcIter.next();
             BooleanContainer hasReferenceParams = new BooleanContainer();
             hasReferenceParams.data = new Boolean(false);
             //genCode.append("The name of the function is" + funcNameStr + "\n");
@@ -195,7 +197,56 @@ public class Interp {
         return Stack.getStackTrace(lineNumber());
     }
 
+
+
     /** Returns a summarized contents of the stack trace */
+
+    private void mapThreeVersions(String fname, AslTree f) {
+        listFunc.add(fname);
+        FuncName2Tree.put(fname, f);
+        listFunc.add(fname + "$");
+        FuncName2Tree.put(fname + "$", f);//the parallel version points the same node
+        listFunc.add(fname + "_");
+        FuncName2Tree.put(fname + "_", f);//the parallel version points the same node
+    }
+
+//for the moment it supports only calls with 0 parameters
+    private AslTree getFuncTree(String returnType, String fname) {
+        Token functionToken = new CommonToken(AslLexer.ID, fname);
+        AslTree returnTree = new AslTree(functionToken);
+        Token paramsToken = new CommonToken(AslLexer.PARAMS);
+        AslTree paramsTree = new AslTree(paramsToken);
+        
+        Token returnTypeToken; 
+        if (returnType.equals("int"))
+            returnTypeToken = new CommonToken(AslLexer.INT, returnType);
+        else 
+            returnTypeToken = new CommonToken(AslLexer.BOOL, returnType);
+
+        AslTree typeTree = new AslTree(returnTypeToken);
+
+        returnTree.addChild(typeTree);
+        returnTree.addChild(paramsTree);
+        return returnTree;
+    }
+
+    private void mapBuiltinFunctions() {
+        /*PUT HERE ALL BUILTIN functions, the ones supported by openmp.h*/
+        String tinyParFuncName = "getNumThreads";
+        String builtinFuncName = "omp_get_num_threads";
+        String returnType = "int";
+        AslTree funcTree = getFuncTree(returnType, builtinFuncName);
+        hashBuiltinFunc.put(tinyParFuncName, builtinFuncName);
+        FuncName2Tree.put(builtinFuncName, funcTree);
+       
+        tinyParFuncName = "getThreadId";
+        builtinFuncName = "omp_get_thread_num";
+        returnType = "int";
+        funcTree = getFuncTree(returnType, builtinFuncName);
+        hashBuiltinFunc.put(tinyParFuncName, builtinFuncName);
+        FuncName2Tree.put(builtinFuncName, funcTree);
+       
+    }
 
     /**
      * Gathers information from the AST and creates the map from
@@ -220,18 +271,14 @@ public class Interp {
                     throw new RuntimeException("Multiple definitions of function " + fname);
                 }
                 else {
-                    listFunc.add(fname);
-                    FuncName2Tree.put(fname, f);
-                    listFunc.add(fname + "$");
-                    FuncName2Tree.put(fname + "$", f);//the parallel version points the same node
-                    listFunc.add(fname + "_");
-                    FuncName2Tree.put(fname + "_", f);//the parallel version points the same node
+                    mapThreeVersions(fname, f);
                 }
             }
             else 
                 FuncName2Tree.put("main", f);
             ++i;
-        } 
+        }
+        mapBuiltinFunctions();
     }
 
     /**
@@ -407,7 +454,11 @@ public class Interp {
     private Data generateFuncall(AslTree t, StringBuilder genCode) {
         String funcName = t.getChild(0).getText();
         String errorMessage;
-        if (inParallelRegion && inNotSyncRegion) {
+        if (hashBuiltinFunc.containsKey(funcName)) {
+            errorMessage = "This error shouldn't be displayed";
+            funcName = hashBuiltinFunc.get(funcName); //we make a traduction to OpenMP builtin functions
+        }
+        else if (inParallelRegion && inNotSyncRegion) {
             errorMessage = "Call to unexisting not syncronized version of function "+ funcName;
             funcName = funcName + "_";
         }
@@ -633,8 +684,9 @@ public class Interp {
 
                 }
                 Data value = generateExpression(exprNode, genCode);
+                //System.err.println("The two types are "+ value.getType() + " and "+ toChange.getType());
                 if (!value.getType().equals(toChange.getType()))
-                    throw new RuntimeException ("Right hand side value doesn't have the same type of the vector");
+                    throw new RuntimeException ("Right hand side expression doesn't have the same typeas the left hand side variable");
 
                // genCode.append(";\n");
                 return;

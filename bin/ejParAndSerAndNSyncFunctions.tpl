@@ -7,17 +7,17 @@ int test (int & hola){
         hola = 3;
     }
     //for another test just comment the following begin_parallel..end_parallel
-    begin_parallel
-    {
+//    begin_parallel
+ //   {
         i = i + 1;
-    } end_parallel
+//    } end_parallel
     return i;
 }
 
 int hola;
-//begin_parallel{
+begin_parallel{
 //    not_sync {
         test(hola);
 //    }
-//}end_parallel
+}end_parallel
 
