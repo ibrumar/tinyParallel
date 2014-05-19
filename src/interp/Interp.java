@@ -49,6 +49,9 @@ public class Interp {
     private static int counterSpace = 0;
     
     private static ArrayList<String> listFunc = new ArrayList<String>();
+    
+    private static ArrayList<Pair<Integer, AslTree>> listFirstPrivate = new ArrayList<Pair<Integer, AslTree>>();
+    private static ArrayList<String> listFirstPrivate2 = new ArrayList<String>();
 
     /**
      * Map between function names (keys) and ASTs (values).
@@ -452,6 +455,13 @@ public class Interp {
         return value;
     }
 
+    /*static boolean isFirstPrivate (AslTree t){
+        boolean rep = false;
+        while (!rep && ){
+            
+        }
+    
+    }*/
 
     void generateParallelZone(AslTree t, StringBuilder genCode) throws ParallelException {
         /** Says if the compilation is done in a parallel region */
@@ -462,15 +472,53 @@ public class Interp {
         inParallelRegion = true;
         String parallelZoneHeader = "#pragma omp parallel default(shared)";
         
-        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+        
+        //first_private
+        if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR) { //there are also first private variables
+            AslTree firstPrivateVarNode = t.getChild(0);
+            parallelZoneHeader += " firstprivate("; //there must be at least one first private var
+            boolean first = true; 
+           
+            for (int i = 0; i < firstPrivateVarNode.getChildCount(); ++i) {
+                Data firstPrivateVar = Stack.getVariable(firstPrivateVarNode.getChild(i).getText());
+               
+                int val_firstPrivateVar = firstPrivateVarNode.getChild(i).getIntValue();
+                listFirstPrivate.add(new Pair (val_firstPrivateVar, firstPrivateVarNode));
+                listFirstPrivate2.add(firstPrivateVarNode.getChild(i).getText());  
+               
+                firstPrivateVar.setShared(false);
+                
+                if (firstPrivateVar.isVector())
+                    throw new RuntimeException ("The arrays in tiny-parallel language can't be first privatized");
+                
+                if (first) first = false;
+                else parallelZoneHeader += ", ";
+                parallelZoneHeader += firstPrivateVarNode.getChild(i).getText();
+            }
+            parallelZoneHeader += ")";
+        }
+        //end
+        
+        
+        //private vars (case 1)
+        if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR 
+            && t.getChild(1).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
-            AslTree privateVarNode = t.getChild(0);
+            AslTree privateVarNode = t.getChild(1);
+            
             parallelZoneHeader += " private("; //there must be at least one private var
             boolean first = true; 
            
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
-                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+               
+                AslTree p =  privateVarNode.getChild(i);
+             
+                if (listFirstPrivate2.contains(p.getText()))
+                    throw new RuntimeException ("This variable has been already declared as first private");
+              
+                Data thePrivateVar = Stack.getVariable(p.getText());
                 thePrivateVar.setShared(false);
+                
                 if (thePrivateVar.isVector())
                     throw new RuntimeException ("The arrays in tiny-parallel language can't be privatized");
                 
@@ -481,30 +529,85 @@ public class Interp {
             parallelZoneHeader += ")";
         } 
         
-
-        genCode.append(parallelZoneHeader + "\n");
+        //private vars (case 2)
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+            AslTree privateVarNode = t.getChild(0);
+            parallelZoneHeader += " private("; //there must be at least one private var
+            boolean first = true; 
+           
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                AslTree p = privateVarNode.getChild(i);
+                Data thePrivateVar = Stack.getVariable(p.getText());
+                thePrivateVar.setShared(false);
         
+                if (thePrivateVar.isVector())
+                    throw new RuntimeException ("The arrays in tiny-parallel language can't be privatized");
+                
+                if (first) first = false;
+                else parallelZoneHeader += ", ";
+                parallelZoneHeader += privateVarNode.getChild(i).getText();
+            }
+            parallelZoneHeader += ")";
+        } 
+           
+        genCode.append(parallelZoneHeader + "\n"); 
         genCode.append(xTimesChar(counterSpace) + "{" + "\n");
         counterSpace += 2;
-       
-        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR)
-            generateListInstructions(t.getChild(1), genCode);
-        else 
-            generateListInstructions(t.getChild(0), genCode);
         
+       //Instructions
+        if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR){
+            if (t.getChild(1).getType() == AslLexer.PRIVATE_VAR){
+            generateListInstructions(t.getChild(2), genCode);
+            }
+            else {generateListInstructions(t.getChild(1), genCode);
+                }
+            }
+        else{
+                if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
+                  generateListInstructions(t.getChild(1), genCode);
+                }
+                else {generateListInstructions(t.getChild(0), genCode);
+                    }
+            }
+            
         counterSpace -= 2;
         genCode.append(xTimesChar(counterSpace) +"}" + "\n");
 
+        //first private var
+        if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR) { //there are also first private variables
+           
+            AslTree firstPrivateVarNode = t.getChild(0);
+
+            for (int i = 0; i < firstPrivateVarNode.getChildCount(); ++i) {
+                Data firstPrivateVar = Stack.getVariable(firstPrivateVarNode.getChild(i).getText());
+                firstPrivateVar.setShared(true);
+                (listFirstPrivate.get(i).getElement1()).setIntValue(listFirstPrivate.get(i).getElement0());      
+            }
+        }
+        //end
         
-        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
+        //private var (case 1)
+        if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR 
+            && t.getChild(1).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             
+            AslTree privateVarNode = t.getChild(1);
+
+            for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
+                Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
+                thePrivateVar.setShared(true);
+                (listFirstPrivate.get(i).getElement1()).setIntValue(listFirstPrivate.get(i).getElement0()); 
+            }
+        }
+        
+        //private var (case 2)
+        if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR) { //there are also private variables
             AslTree privateVarNode = t.getChild(0);
 
             for (int i = 0; i < privateVarNode.getChildCount(); ++i) {
                 Data thePrivateVar = Stack.getVariable(privateVarNode.getChild(i).getText());
                 thePrivateVar.setShared(true);
             }
-        }
+        }       
         // you must take care because the variables declared inside the parallel zone must die
         inParallelRegion = false;
     }
@@ -524,7 +627,7 @@ public class Interp {
         
         //case pragma omp critical - we don't want to permit to use a variable with critical in the header of the header of a parallel_for
 		if (variant.isShared() && !inNotSyncRegion && inParallelRegion) 
-		    throw new RuntimeException ("Variant of the header of a parallel_for must be private variable in");
+		    throw new RuntimeException ("Variant of the header of a parallel_for must be first private / private variable in");
 		
         if (!variant.isInteger()) throw new RuntimeException ("Variant must be an integer for a boucle for"); 
 		

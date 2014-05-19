@@ -64,6 +64,9 @@ public class AslTree extends CommonTree {
 
     /** Define the integer value of the node. */
     public void setIntValue() { intValue = Integer.parseInt(getText()); }
+    
+    /** Define the integer value of the node. */
+    public void setIntValue(int val) { intValue = (Integer)val; }
 
     /** Get the Boolean value of the node. */
     public boolean getBooleanValue() { return intValue != 0; }

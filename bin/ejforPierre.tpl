@@ -40,7 +40,8 @@ k = 7 + 8 + 12;
 
 
 begin_parallel
-private_var : k;
+first_private_var : k, o, test; 
+private_var : a;
 {
 int ajub;
 parallel_for (k = 0; k<99; k = k + 7){
@@ -55,7 +56,11 @@ c := b $ 4-9+6 $;
 } 
 end_parallel
 
-for (k = 0; k<99; a = a + 7){
+if (true){
+read k;
+}
+
+for (k = 0; k<99; k = k + 7){
 int ja;
 ja = ja +2;
 write ja;

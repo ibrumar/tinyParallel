@@ -79,13 +79,15 @@ block_instructions	: '{' instruction* '}' -> ^(INSTR_BLOCK instruction*)
 //parallel_instruction_block : BEGIN_PARALLEL '{'! parallel_bloc_header block_instructions'}'!  END_PARALLEL
 
 
-parallel_instruction	:	BEGIN_PARALLEL^  parallel_bloc_header block_instructions END_PARALLEL! |
+parallel_instruction	:	BEGIN_PARALLEL^  parallel_bloc_header_first parallel_bloc_header block_instructions END_PARALLEL! |
 								NOT_SYNC^ block_instructions	|
 								PARALLEL_FOR^ for_header block_instructions |
 								ID eq=PAR_EQUAL ID '$' expr '$;'-> ^(PAR_ASSIGN[$eq,":="] ID ID expr);
 
+parallel_bloc_header_first : (FIRST_PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)? ;
+
 //variables compartidas por defecto
-parallel_bloc_header	:	(PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)?  ;
+parallel_bloc_header	:	(PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)? ;
 
 
 for_header: '('! assign  ';'! expr ';'! assign ')'!;
@@ -188,6 +190,7 @@ IF  	: 'if' ;
 ELSE	: 'else' ;
 PARALLEL_FOR	:	'parallel_for';
 PRIVATE_VAR		:	'private_var';
+FIRST_PRIVATE_VAR		:	'first_private_var';
 BEGIN_PARALLEL	:	'begin_parallel';
 END_PARALLEL	:	'end_parallel';
 NOT_SYNC			:	'not_sync';
