@@ -45,6 +45,7 @@ instruction
 			|	meufor
 			|	parallel_instruction
 			|	decl ';'!
+			|   barrier
 			;
 
 /*LANGUAGE SPECIFIC TOKENS*/
@@ -91,6 +92,8 @@ parallel_bloc_header	:	(PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)? ;
 
 
 for_header: '('! assign  ';'! expr ';'! assign ')'!;
+
+barrier : BARRIER ;
 
 // Assignment
 assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,"="] ident expr)
@@ -188,6 +191,7 @@ AND	    : 'and' ;
 OR	    : 'or' ;	
 IF  	: 'if' ;
 ELSE	: 'else' ;
+BARRIER : 'barrier';
 PARALLEL_FOR	:	'parallel_for';
 PRIVATE_VAR		:	'private_var';
 FIRST_PRIVATE_VAR		:	'first_private_var';

@@ -421,7 +421,7 @@ public class Interp {
             String indentation = xTimesChar(counterSpace);
             if (t.getChild(i).getType() != AslLexer.NOT_SYNC){
                 genCode.append(indentation);
-            }
+            }      
             generateInstruction (t.getChild(i), genCode);
             if (t.getChild(i).getType() == AslLexer.ASSIGN){
             	genCode.append(";" + "\n");
@@ -714,6 +714,17 @@ public class Interp {
             case AslLexer.BEGIN_PARALLEL:
             {
                 generateParallelZone(t, genCode);
+                return;
+            }
+            
+            case AslLexer.BARRIER:
+            {
+                if (inParallelRegion) genCode.append("#pragma omp barrier\n");
+                else 
+                {
+                    genCode.append("\r");
+                    System.err.print ("Note: Using a barrier outside a parallel region is useless:"+ lineNumber() + "\n");
+                }
                 return;
             }
 
