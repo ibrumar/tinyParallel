@@ -82,8 +82,11 @@ block_instructions	: '{' instruction* '}' -> ^(INSTR_BLOCK instruction*)
 
 parallel_instruction	:	BEGIN_PARALLEL^  parallel_bloc_header_first parallel_bloc_header block_instructions END_PARALLEL! |
 								NOT_SYNC^ block_instructions	|
-								PARALLEL_FOR^ for_header block_instructions |
+								PARALLEL_FOR for_header reduction_clause? block_instructions -> ^(PARALLEL_FOR for_header  block_instructions reduction_clause?) |
+							//	PARALLEL_FOR^ for_header reduction_clause? block_instructions |
 								ID eq=PAR_EQUAL ID '$' expr '$;'-> ^(PAR_ASSIGN[$eq,":="] ID ID expr);
+
+reduction_clause		:	REDUCTION^ '('! (PLUS|MINUS|AND|MUL) ':'! ID ')';
 
 parallel_bloc_header_first : (FIRST_PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)? ;
 
@@ -198,6 +201,7 @@ FIRST_PRIVATE_VAR		:	'first_private_var';
 BEGIN_PARALLEL	:	'begin_parallel';
 END_PARALLEL	:	'end_parallel';
 NOT_SYNC			:	'not_sync';
+REDUCTION		:	'reduction';
 FOR	:	'for';
 FUNC	: 'func' ;
 RETURN	: 'return' ;

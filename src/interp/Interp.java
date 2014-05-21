@@ -496,6 +496,7 @@ public class Interp {
     }
 
     void generateParallelZone(AslTree t, StringBuilder genCode) throws ParallelException {
+        ArrayList<String> listFirstPrivate3 = new ArrayList<String>();
         /** Says if the compilation is done in a parallel region */
         if (inParallelRegion)
             throw new ParallelException ("Opening parallel region inside another one");
@@ -578,7 +579,7 @@ public class Interp {
             }
             parallelZoneHeader += ")";
         } 
-           
+        
         genCode.append(parallelZoneHeader + "\n"); 
         genCode.append(xTimesChar(counterSpace) + "{" + "\n");
         counterSpace += 2;
@@ -586,18 +587,20 @@ public class Interp {
        //Instructions
         if (t.getChild(0).getType() == AslLexer.FIRST_PRIVATE_VAR){
             if (t.getChild(1).getType() == AslLexer.PRIVATE_VAR){
-            generateListInstructions(t.getChild(2), genCode);
+                generateListInstructions(t.getChild(2), genCode);
             }
-            else {generateListInstructions(t.getChild(1), genCode);
-                }
+            else {
+                generateListInstructions(t.getChild(1), genCode);
             }
-        else{
-                if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
-                  generateListInstructions(t.getChild(1), genCode);
-                }
-                else {generateListInstructions(t.getChild(0), genCode);
-                    }
+        }
+        else {
+            if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
+                generateListInstructions(t.getChild(1), genCode);
             }
+            else {
+                generateListInstructions(t.getChild(0), genCode);
+            }
+        }
             
         counterSpace -= 2;
         genCode.append(xTimesChar(counterSpace) +"}" + "\n");
@@ -717,6 +720,11 @@ public class Interp {
                 return;
             }
             
+            case AslLexer.REDUCTION:
+            {
+                return;
+            }
+
             case AslLexer.BARRIER:
             {
                 if (inParallelRegion) genCode.append("#pragma omp barrier\n");
@@ -873,16 +881,28 @@ public class Interp {
                 if(!inParallelRegion) throw new ParallelException(); 
                       
                 //print del pragma
-                genCode.append("#pragma omp for\n");
+                genCode.append("#pragma omp for");
                 counterSpace += 2;
                 
+                if (t.getChildCount() == 5) {
+                    AslTree reductionNode = t.getChild(4); //assuming that in the for header
+                    //there are 3 more nodes-> assign, expr, assign
+                    genCode.append(" reduction(" + reductionNode.getChild(0).getText() + ":");
+                    genCode.append(reductionNode.getChild(1).getText());
+                    Data reductedVariable = Stack.getVariable(reductionNode.getChild(1).getText());
+                    if (!reductedVariable.isShared())
+                        throw new RuntimeException ("The reducted variable "+ reductionNode.getChild(1).getText() +" should be shared before parallel for:" + lineNumber());
+                    reductedVariable.setShared(false);
+                    genCode.append(")");
+                } 
+                genCode.append("\n");
                 //gestion de private/shared by instructions/expressiones
                 
                 /*Header del for*/
                 genCode.append(xTimesChar(counterSpace));
                 generateHeaderFor(t, genCode);
                 /*Cuerpo del for*/
-                generateListInstructions(t.getChild(3), genCode);
+                generateListInstructions(t.getChild(3), genCode); //I don't understand how can it be the third
                 counterSpace -= 2;
                 genCode.append(xTimesChar(counterSpace) +"} \n");
                 counterSpace -= 2;

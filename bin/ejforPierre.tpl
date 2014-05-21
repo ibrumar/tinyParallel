@@ -40,14 +40,15 @@ k = 7 + 8 + 12;
 
 
 begin_parallel
-first_private_var : k, o, test; 
-private_var : a;
+first_private_var : k, test; 
+private_var : a, o;
+
 {
 int ajub;
-parallel_for (k = 0; k<99; k = k + 7){
-int t;
-int aaaaaa;
-int anonjunaue;
+parallel_for (k = 0; k<99; k = k + 7) reduction(+:o){
+    int t;
+    int aaaaaa;
+    int anonjunaue;
 }
 
 o = o + 10;
