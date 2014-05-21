@@ -45,7 +45,6 @@ instruction
 			|	meufor
 			|	parallel_instruction
 			|	decl ';'!
-			|   barrier
 			;
 
 /*LANGUAGE SPECIFIC TOKENS*/
@@ -82,9 +81,15 @@ block_instructions	: '{' instruction* '}' -> ^(INSTR_BLOCK instruction*)
 
 parallel_instruction	:	BEGIN_PARALLEL^  parallel_bloc_header_first parallel_bloc_header block_instructions END_PARALLEL! |
 								NOT_SYNC^ block_instructions	|
+<<<<<<< HEAD
 								PARALLEL_FOR for_header reduction_clause? block_instructions -> ^(PARALLEL_FOR for_header  block_instructions reduction_clause?) |
 							//	PARALLEL_FOR^ for_header reduction_clause? block_instructions |
 								ID eq=PAR_EQUAL ID '$' expr '$;'-> ^(PAR_ASSIGN[$eq,":="] ID ID expr);
+=======
+								PARALLEL_FOR^ for_header block_instructions |
+								ID eq=PAR_EQUAL ID '$' expr '$;'-> ^(PAR_ASSIGN[$eq,":="] ID ID expr) |
+								BARRIER;
+>>>>>>> e0f68b27048b11d89ab30687246f892d870abd26
 
 reduction_clause		:	REDUCTION^ '('! (PLUS|MINUS|AND|MUL) ':'! ID ')';
 
@@ -95,8 +100,6 @@ parallel_bloc_header	:	(PRIVATE_VAR^ ':'! ID (','! ID)* ';'!)? ;
 
 
 for_header: '('! assign  ';'! expr ';'! assign ')'!;
-
-barrier : BARRIER ;
 
 // Assignment
 assign	:	ident eq=EQUAL expr -> ^(ASSIGN[$eq,"="] ident expr)
