@@ -14,7 +14,8 @@ int k;
 int o;
 o = 92;
 k = 7 + 8 + 12;
-
+int test;
+test = 7;
 
 for (k = 0; k<99; k = k + 7){
 int ja;
@@ -23,22 +24,24 @@ write ja;
 }
 
 begin_parallel
-/*first_private_var : k, test; 
-private_var : a, o;
+first_private_var : k, test; 
+private_var : a;
 
 {
 int ajub;
 parallel_for (k = 0; k<99; k = k + 7) reduction(+:o){
     int t;
     int aaaaaa;
-    int anonjunaue;*/
-first_private_var : k, o; 
-private_var : a;
-{
+    int anonjunaue;
+}
+   
+    
+    
+//first_private_var : k, o; 
+//private_var : a;
+//{
 parallel_for (k = 0; k<99; k = k + 7){
-int t;
-t = t+2;
->>>>>>> e0f68b27048b11d89ab30687246f892d870abd26
+test = test+2;
 }
 
 ovec  := c $ 2 $;

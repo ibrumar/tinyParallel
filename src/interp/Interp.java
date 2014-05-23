@@ -581,28 +581,26 @@ public class Interp {
             if (t.getChild(1).getType() == AslLexer.PRIVATE_VAR){
                 generateListInstructions(t.getChild(2), genCode);
             }
-<<<<<<< HEAD
+
             else {
                 generateListInstructions(t.getChild(1), genCode);
             }
         }
+        
+        
+        
+        
+        
         else {
             if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
                 generateListInstructions(t.getChild(1), genCode);
             }
             else {
                 generateListInstructions(t.getChild(0), genCode);
-=======
-            else generateListInstructions(t.getChild(1), genCode);
-            }
-        else{
-                if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
-                  generateListInstructions(t.getChild(1), genCode);
-                }
-                else generateListInstructions(t.getChild(0), genCode);
->>>>>>> e0f68b27048b11d89ab30687246f892d870abd26
-            }
-        }
+            }    
+                
+        }        
+        
             
         counterSpace -= 2;
         genCode.append(xTimesChar(counterSpace) +"}" + "\n");
