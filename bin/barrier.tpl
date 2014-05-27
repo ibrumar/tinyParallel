@@ -1,3 +1,5 @@
+//test
+
 int test (int i){
 i = i+2;
 if (false){
@@ -17,7 +19,7 @@ int test;
 
 begin_parallel
 first_private_var : o; 
-private_var : test,k, k,a;
+private_var : test,k,a;
 {
 k = k+3;
 barrier

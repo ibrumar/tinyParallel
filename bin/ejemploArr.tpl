@@ -1,3 +1,4 @@
+//test
 int a;
 a = 1;
 int b[1 + 1/a + a];

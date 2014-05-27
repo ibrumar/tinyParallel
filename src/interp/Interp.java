@@ -201,7 +201,7 @@ public class Interp {
         FuncName2Tree.put(fname + "_", f);//the parallel version points the same node
     }
 
-//for the moment it supports only calls with 0 parameters
+    //for the moment it supports only calls with 0 parameters
     private AslTree getFuncTree(String returnType, String fname) {
         Token functionToken = new CommonToken(AslLexer.ID, fname);
         AslTree returnTree = new AslTree(functionToken);
@@ -587,10 +587,6 @@ public class Interp {
             }
         }
         
-        
-        
-        
-        
         else {
             if (t.getChild(0).getType() == AslLexer.PRIVATE_VAR){
                 generateListInstructions(t.getChild(1), genCode);
@@ -599,8 +595,7 @@ public class Interp {
                 generateListInstructions(t.getChild(0), genCode);
             }    
                 
-        }        
-        
+        }  
             
         counterSpace -= 2;
         genCode.append(xTimesChar(counterSpace) +"}" + "\n");
@@ -668,14 +663,10 @@ public class Interp {
         
         generateInstruction(forPlus, genCode);
         
-           	
         genCode.append(") { \n");
         counterSpace += 2;
     }
-
-
-
-                    
+     
     /**
      * Executes an instruction. 
      * Non-null results are only returned by "return" statements.
@@ -1095,7 +1086,7 @@ public class Interp {
         Data value2;
         switch (type) {
             // Relational operators
-            case AslLexer.EQUAL:
+            case AslLexer.EQUALEQUAL:
             case AslLexer.NOT_EQUAL:
             case AslLexer.LT:
             case AslLexer.LE:
@@ -1108,8 +1099,8 @@ public class Interp {
                 
                 if (! value.getType().equals(value2.getType())) {
                     throw new RuntimeException ("Incompatible types in relational expression");
-
                 }
+                value = new Data("bool");
                 break;
 
             // Arithmetic operators
