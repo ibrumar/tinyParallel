@@ -8,4 +8,4 @@ fi
 echo "Precompiling"
 ./Asl $1.tpl > $1.cpp
 echo "Compiling"
-g++ $1.cpp -O0 -o $1 -fopenmp 
+g++ $1.cpp -O3 -o $1 -fopenmp 
